@@ -4,16 +4,20 @@ import { searchCardsByExactNamesFn } from '../lib/server/card-actions'
 
 export const Route = createFileRoute('/pick-list')({ component: PickListPage })
 
-type PickListResult = {
-  requested: string
-  status: string
+type PickListLocation = {
   box: string
   position: string | number
 }
 
+type PickListGroup = {
+  requested: string
+  status: string
+  locations: PickListLocation[]
+}
+
 function PickListPage() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<PickListResult[]>([])
+  const [results, setResults] = useState<PickListGroup[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,28 +36,27 @@ function PickListPage() {
 
     try {
       const matches = await searchCardsByExactNamesFn({ data: requestedNames })
-      const nextResults = requestedNames.flatMap((requested) => {
+      const nextResults = requestedNames.map((requested) => {
         const cardMatches = matches.filter(
           (entry) => entry.name.toLowerCase() === requested.toLowerCase(),
         )
 
         if (cardMatches.length === 0) {
-          return [
-            {
-              requested,
-              status: 'Not found',
-              box: '—',
-              position: '—',
-            },
-          ]
+          return {
+            requested,
+            status: 'Not found',
+            locations: [],
+          }
         }
 
-        return cardMatches.map((match) => ({
+        return {
           requested,
-          status: `Found (${cardMatches.length})`,
-          box: `${match.boxCode} · ${match.boxName}`,
-          position: match.position,
-        }))
+          status: `Found in ${cardMatches.length} location${cardMatches.length === 1 ? '' : 's'}`,
+          locations: cardMatches.map((match) => ({
+            box: `${match.boxCode} · ${match.boxName}`,
+            position: match.position,
+          })),
+        }
       })
 
       setResults(nextResults)
@@ -92,38 +95,49 @@ function PickListPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold">Results</h2>
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800">
-          <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-            <thead className="bg-slate-50 dark:bg-slate-950/60">
-              <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
-                <th className="px-4 py-3 font-medium">Requested</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Box</th>
-                <th className="px-4 py-3 font-medium">Position</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {results.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
-                  >
-                    No pick list generated yet.
-                  </td>
-                </tr>
-              ) : (
-                results.map((result, index) => (
-                  <tr key={`${result.requested}-${result.box}-${result.position}-${index}`}>
-                    <td className="px-4 py-4 text-sm">{result.requested}</td>
-                    <td className="px-4 py-4 text-sm">{result.status}</td>
-                    <td className="px-4 py-4 text-sm">{result.box}</td>
-                    <td className="px-4 py-4 text-sm">{result.position}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        <div className="mt-4 space-y-4">
+          {results.length === 0 ? (
+            <div className="rounded-2xl border border-slate-200 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+              No pick list generated yet.
+            </div>
+          ) : (
+            results.map((result) => (
+              <section
+                key={result.requested}
+                className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800"
+              >
+                <div className="flex flex-col gap-1 bg-slate-50 px-4 py-4 dark:bg-slate-950/60">
+                  <h3 className="text-base font-semibold">{result.requested}</h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{result.status}</p>
+                </div>
+
+                {result.locations.length === 0 ? (
+                  <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
+                    No indexed copies found.
+                  </div>
+                ) : (
+                  <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                    <thead className="bg-white dark:bg-slate-900">
+                      <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
+                        <th className="px-4 py-3 font-medium">Box</th>
+                        <th className="px-4 py-3 font-medium">Position</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                      {result.locations.map((location, index) => (
+                        <tr
+                          key={`${result.requested}-${location.box}-${location.position}-${index}`}
+                        >
+                          <td className="px-4 py-4 text-sm">{location.box}</td>
+                          <td className="px-4 py-4 text-sm">{location.position}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </section>
+            ))
+          )}
         </div>
       </section>
     </div>
