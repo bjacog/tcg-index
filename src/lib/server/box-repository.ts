@@ -5,15 +5,12 @@ import {
   type BoxSettings,
   type CreateBoxInput,
   type SetActiveScanningBoxInput,
+  type SetPollingEnabledInput,
   type UpdateBoxInput,
+  type UpdatePollingSettingsInput,
   normalizeBoxInput,
 } from '../boxes'
-import {
-  getBoxSettings as getBoxSettingsFromStore,
-  getDb,
-  runInTransaction,
-  setSetting,
-} from './store'
+import { getAppSettings, getDb, runInTransaction, setAppSetting } from './store'
 
 function mapBoxRow(row: Record<string, unknown>): BoxRecord {
   return {
@@ -46,7 +43,29 @@ export async function getBoxById(id: string) {
 }
 
 export async function getBoxSettings(): Promise<BoxSettings> {
-  return getBoxSettingsFromStore()
+  return getAppSettings()
+}
+
+export async function updatePollingSettings(input: UpdatePollingSettingsInput) {
+  const endpoint = input.delverPollingEndpoint.trim()
+
+  setAppSetting('delverPollingEndpoint', endpoint || null)
+  return getAppSettings()
+}
+
+export async function setPollingEnabled(input: SetPollingEnabledInput) {
+  const settings = getAppSettings()
+
+  if (input.enabled && !settings.delverPollingEndpoint) {
+    throw new BoxError('POLLING_ENDPOINT_MISSING', 'Set the Delver polling endpoint first')
+  }
+
+  if (input.enabled && !settings.activeScanningBoxId) {
+    throw new BoxError('NO_ACTIVE_SCANNING_BOX', 'Set an active scanning box before polling')
+  }
+
+  setAppSetting('delverPollingEnabled', input.enabled ? 'true' : 'false')
+  return getAppSettings()
 }
 
 export async function createBox(input: CreateBoxInput) {
@@ -141,8 +160,16 @@ export async function setActiveScanningBox(input: SetActiveScanningBoxInput) {
     }
   }
 
-  setSetting('activeScanningBoxId', input.boxId)
-  return getBoxSettingsFromStore()
+  setAppSetting('activeScanningBoxId', input.boxId)
+  setAppSetting('delverPollingEnabled', input.boxId ? 'true' : 'false')
+
+  return getAppSettings()
+}
+
+export async function stopScanning() {
+  setAppSetting('delverPollingEnabled', 'false')
+  setAppSetting('activeScanningBoxId', null)
+  return getAppSettings()
 }
 
 export async function deleteBox(id: string) {
@@ -155,8 +182,9 @@ export async function deleteBox(id: string) {
   runInTransaction((db) => {
     db.prepare('DELETE FROM boxes WHERE id = ?').run(id)
 
-    if (getBoxSettingsFromStore().activeScanningBoxId === id) {
-      setSetting('activeScanningBoxId', null)
+    if (getAppSettings().activeScanningBoxId === id) {
+      setAppSetting('activeScanningBoxId', null)
+      setAppSetting('delverPollingEnabled', 'false')
     }
   })
 

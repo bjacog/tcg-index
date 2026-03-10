@@ -14,6 +14,7 @@ import { Route as BoxesRouteImport } from './routes/boxes'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BoxesBoxIdRouteImport } from './routes/boxes.$boxId'
 import { Route as ApiDelverWebhookRouteImport } from './routes/api.delver-webhook'
+import { Route as ApiDelverPollRouteImport } from './routes/api.delver-poll'
 import { Route as BoxesBoxIdScanRouteImport } from './routes/boxes.$boxId.scan'
 
 const PickListRoute = PickListRouteImport.update({
@@ -41,6 +42,11 @@ const ApiDelverWebhookRoute = ApiDelverWebhookRouteImport.update({
   path: '/api/delver-webhook',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDelverPollRoute = ApiDelverPollRouteImport.update({
+  id: '/api/delver-poll',
+  path: '/api/delver-poll',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BoxesBoxIdScanRoute = BoxesBoxIdScanRouteImport.update({
   id: '/scan',
   path: '/scan',
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/boxes': typeof BoxesRouteWithChildren
   '/pick-list': typeof PickListRoute
+  '/api/delver-poll': typeof ApiDelverPollRoute
   '/api/delver-webhook': typeof ApiDelverWebhookRoute
   '/boxes/$boxId': typeof BoxesBoxIdRouteWithChildren
   '/boxes/$boxId/scan': typeof BoxesBoxIdScanRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/boxes': typeof BoxesRouteWithChildren
   '/pick-list': typeof PickListRoute
+  '/api/delver-poll': typeof ApiDelverPollRoute
   '/api/delver-webhook': typeof ApiDelverWebhookRoute
   '/boxes/$boxId': typeof BoxesBoxIdRouteWithChildren
   '/boxes/$boxId/scan': typeof BoxesBoxIdScanRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/boxes': typeof BoxesRouteWithChildren
   '/pick-list': typeof PickListRoute
+  '/api/delver-poll': typeof ApiDelverPollRoute
   '/api/delver-webhook': typeof ApiDelverWebhookRoute
   '/boxes/$boxId': typeof BoxesBoxIdRouteWithChildren
   '/boxes/$boxId/scan': typeof BoxesBoxIdScanRoute
@@ -78,6 +87,7 @@ export interface FileRouteTypes {
     | '/'
     | '/boxes'
     | '/pick-list'
+    | '/api/delver-poll'
     | '/api/delver-webhook'
     | '/boxes/$boxId'
     | '/boxes/$boxId/scan'
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/boxes'
     | '/pick-list'
+    | '/api/delver-poll'
     | '/api/delver-webhook'
     | '/boxes/$boxId'
     | '/boxes/$boxId/scan'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/boxes'
     | '/pick-list'
+    | '/api/delver-poll'
     | '/api/delver-webhook'
     | '/boxes/$boxId'
     | '/boxes/$boxId/scan'
@@ -103,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoxesRoute: typeof BoxesRouteWithChildren
   PickListRoute: typeof PickListRoute
+  ApiDelverPollRoute: typeof ApiDelverPollRoute
   ApiDelverWebhookRoute: typeof ApiDelverWebhookRoute
 }
 
@@ -143,6 +156,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDelverWebhookRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/delver-poll': {
+      id: '/api/delver-poll'
+      path: '/api/delver-poll'
+      fullPath: '/api/delver-poll'
+      preLoaderRoute: typeof ApiDelverPollRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/boxes/$boxId/scan': {
       id: '/boxes/$boxId/scan'
       path: '/scan'
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoxesRoute: BoxesRouteWithChildren,
   PickListRoute: PickListRoute,
+  ApiDelverPollRoute: ApiDelverPollRoute,
   ApiDelverWebhookRoute: ApiDelverWebhookRoute,
 }
 export const routeTree = rootRouteImport

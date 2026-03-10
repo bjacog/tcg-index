@@ -12,6 +12,8 @@ export type BoxSettings = {
   activeScanningBoxId: string | null
   lastWebhookEventAt: string | null
   lastWebhookEventType: string | null
+  delverPollingEndpoint: string | null
+  delverPollingEnabled: boolean
 }
 
 export type CreateBoxInput = {
@@ -31,6 +33,14 @@ export type UpdateBoxInput = {
 
 export type SetActiveScanningBoxInput = {
   boxId: string | null
+}
+
+export type UpdatePollingSettingsInput = {
+  delverPollingEndpoint: string
+}
+
+export type SetPollingEnabledInput = {
+  enabled: boolean
 }
 
 export class BoxError extends Error {

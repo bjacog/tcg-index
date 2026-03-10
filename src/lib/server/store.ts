@@ -24,6 +24,13 @@ type LegacyStore = {
   settings?: Partial<BoxSettings>
 }
 
+type AppSettingKey =
+  | 'activeScanningBoxId'
+  | 'lastWebhookEventAt'
+  | 'lastWebhookEventType'
+  | 'delverPollingEndpoint'
+  | 'delverPollingEnabled'
+
 function getDatabase() {
   if (database) {
     return database
@@ -88,6 +95,8 @@ function seedDefaultSettings(db: DatabaseSync) {
   insertSetting.run('activeScanningBoxId', null)
   insertSetting.run('lastWebhookEventAt', null)
   insertSetting.run('lastWebhookEventType', null)
+  insertSetting.run('delverPollingEndpoint', null)
+  insertSetting.run('delverPollingEnabled', 'false')
 }
 
 function migrateLegacyJsonStore(db: DatabaseSync) {
@@ -155,6 +164,8 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
     setSetting.run('activeScanningBoxId', parsed.settings?.activeScanningBoxId ?? null)
     setSetting.run('lastWebhookEventAt', parsed.settings?.lastWebhookEventAt ?? null)
     setSetting.run('lastWebhookEventType', parsed.settings?.lastWebhookEventType ?? null)
+    setSetting.run('delverPollingEndpoint', parsed.settings?.delverPollingEndpoint ?? null)
+    setSetting.run('delverPollingEnabled', parsed.settings?.delverPollingEnabled ? 'true' : 'false')
   })
 }
 
@@ -171,7 +182,7 @@ function runSqlTransaction<T>(db: DatabaseSync, callback: () => T) {
   }
 }
 
-export function getSetting(key: keyof BoxSettings) {
+function getRawSetting(key: AppSettingKey) {
   const db = getDatabase()
   const row = db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
     | { value: string | null }
@@ -180,16 +191,18 @@ export function getSetting(key: keyof BoxSettings) {
   return row?.value ?? null
 }
 
-export function setSetting(key: keyof BoxSettings, value: string | null) {
+export function setAppSetting(key: AppSettingKey, value: string | null) {
   const db = getDatabase()
   db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(key, value)
 }
 
-export function getBoxSettings(): BoxSettings {
+export function getAppSettings(): BoxSettings {
   return {
-    activeScanningBoxId: getSetting('activeScanningBoxId'),
-    lastWebhookEventAt: getSetting('lastWebhookEventAt'),
-    lastWebhookEventType: getSetting('lastWebhookEventType'),
+    activeScanningBoxId: getRawSetting('activeScanningBoxId'),
+    lastWebhookEventAt: getRawSetting('lastWebhookEventAt'),
+    lastWebhookEventType: getRawSetting('lastWebhookEventType'),
+    delverPollingEndpoint: getRawSetting('delverPollingEndpoint'),
+    delverPollingEnabled: getRawSetting('delverPollingEnabled') === 'true',
   }
 }
 

@@ -3,7 +3,9 @@ import {
   BoxError,
   type CreateBoxInput,
   type SetActiveScanningBoxInput,
+  type SetPollingEnabledInput,
   type UpdateBoxInput,
+  type UpdatePollingSettingsInput,
 } from '../boxes'
 import {
   createBox,
@@ -12,7 +14,10 @@ import {
   getBoxSettings,
   listBoxes,
   setActiveScanningBox,
+  setPollingEnabled,
+  stopScanning,
   updateBox,
+  updatePollingSettings,
 } from './box-repository'
 
 function mapError(error: unknown): never {
@@ -39,6 +44,30 @@ export const getBoxByIdFn = createServerFn({ method: 'GET' })
 
 export const getBoxSettingsFn = createServerFn({ method: 'GET' }).handler(async () => {
   return getBoxSettings()
+})
+
+export const updatePollingSettingsFn = createServerFn({ method: 'POST' })
+  .inputValidator((input: UpdatePollingSettingsInput) => input)
+  .handler(async ({ data }) => {
+    try {
+      return await updatePollingSettings(data)
+    } catch (error) {
+      mapError(error)
+    }
+  })
+
+export const setPollingEnabledFn = createServerFn({ method: 'POST' })
+  .inputValidator((input: SetPollingEnabledInput) => input)
+  .handler(async ({ data }) => {
+    try {
+      return await setPollingEnabled(data)
+    } catch (error) {
+      mapError(error)
+    }
+  })
+
+export const stopScanningFn = createServerFn({ method: 'POST' }).handler(async () => {
+  return stopScanning()
 })
 
 export const createBoxFn = createServerFn({ method: 'POST' })

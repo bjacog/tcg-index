@@ -7,7 +7,7 @@ import {
   type DelverScannedCard,
 } from '../cards'
 import { getBoxById } from './box-repository'
-import { getBoxSettings, getDb, runInTransaction, setSetting } from './store'
+import { getAppSettings, getDb, runInTransaction, setAppSetting } from './store'
 
 function mapCardRow(row: Record<string, unknown>): CardRecord {
   return {
@@ -69,7 +69,7 @@ export async function searchCardsByExactNames(names: string[]): Promise<CardSear
 }
 
 export async function appendScannedCardsToActiveBox(scannedCards: DelverScannedCard[]) {
-  const settings = getBoxSettings()
+  const settings = getAppSettings()
   const activeBoxId = settings.activeScanningBoxId
 
   if (!activeBoxId) {
@@ -143,8 +143,8 @@ export async function appendScannedCardsToActiveBox(scannedCards: DelverScannedC
       return card
     })
 
-    setSetting('lastWebhookEventAt', now)
-    setSetting('lastWebhookEventType', 'card_scanned')
+    setAppSetting('lastWebhookEventAt', now)
+    setAppSetting('lastWebhookEventType', 'card_scanned')
 
     return nextCards
   })
