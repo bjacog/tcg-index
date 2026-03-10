@@ -6,7 +6,7 @@ export const Route = createFileRoute('/pick-list')({ component: PickListPage })
 
 type PickListCardEntry = {
   name: string
-  positions: Array<string | number>
+  position: number
 }
 
 type PickListBoxGroup = {
@@ -44,26 +44,22 @@ function PickListPage() {
         return !foundNames.has(lowered)
       })
 
-      const boxesMap = new Map<string, Map<string, Array<string | number>>>()
+      const boxesMap = new Map<string, PickListCardEntry[]>()
 
       for (const match of matches) {
         const box = `${match.boxCode} · ${match.boxName}`
-        const existingBoxGroup = boxesMap.get(box) ?? new Map<string, Array<string | number>>()
-        const existingPositions = existingBoxGroup.get(match.name) ?? []
-        existingPositions.push(match.position)
-        existingBoxGroup.set(match.name, existingPositions)
+        const existingBoxGroup = boxesMap.get(box) ?? []
+        existingBoxGroup.push({
+          name: match.name,
+          position: Number(match.position),
+        })
         boxesMap.set(box, existingBoxGroup)
       }
 
       const nextResults = Array.from(boxesMap.entries())
-        .map(([box, cardMap]) => ({
+        .map(([box, cards]) => ({
           box,
-          cards: Array.from(cardMap.entries())
-            .map(([name, positions]) => ({
-              name,
-              positions: positions.sort((a, b) => Number(a) - Number(b)),
-            }))
-            .sort((a, b) => a.name.localeCompare(b.name)),
+          cards: cards.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
         }))
         .sort((a, b) => a.box.localeCompare(b.box))
 
@@ -141,11 +137,14 @@ function PickListPage() {
 
                 <div className="divide-y divide-slate-200 dark:divide-slate-800">
                   {result.cards.map((card) => (
-                    <div key={`${result.box}-${card.name}`} className="px-4 py-4">
-                      <div className="text-sm font-medium">{card.name}</div>
-                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                        Positions: {card.positions.join(', ')}
+                    <div
+                      key={`${result.box}-${card.name}-${card.position}`}
+                      className="flex items-center gap-4 px-4 py-4"
+                    >
+                      <div className="min-w-20 text-2xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
+                        #{card.position}
                       </div>
+                      <div className="text-sm font-medium">{card.name}</div>
                     </div>
                   ))}
                 </div>
