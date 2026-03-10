@@ -1,37 +1,13 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
-import path from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { BoxError, type BoxRecord, type CreateBoxInput, type UpdateBoxInput, normalizeBoxInput } from '../boxes'
-
-type BoxStore = {
-  boxes: BoxRecord[]
-}
-
-const dataDirectory = path.resolve(process.cwd(), 'data')
-const dataFilePath = path.join(dataDirectory, 'boxes.json')
-
-async function ensureStore(): Promise<BoxStore> {
-  await mkdir(dataDirectory, { recursive: true })
-
-  try {
-    const raw = await readFile(dataFilePath, 'utf8')
-    const parsed = JSON.parse(raw) as BoxStore
-
-    if (!parsed || !Array.isArray(parsed.boxes)) {
-      throw new Error('Invalid box store shape')
-    }
-
-    return parsed
-  } catch (error) {
-    const emptyStore: BoxStore = { boxes: [] }
-    await writeFile(dataFilePath, JSON.stringify(emptyStore, null, 2) + '\n', 'utf8')
-    return emptyStore
-  }
-}
-
-async function saveStore(store: BoxStore) {
-  await writeFile(dataFilePath, JSON.stringify(store, null, 2) + '\n', 'utf8')
-}
+import {
+  BoxError,
+  type BoxSettings,
+  type CreateBoxInput,
+  type SetActiveScanningBoxInput,
+  type UpdateBoxInput,
+  normalizeBoxInput,
+} from '../boxes'
+import { ensureStore, saveStore } from './store'
 
 export async function listBoxes() {
   const store = await ensureStore()
@@ -41,6 +17,11 @@ export async function listBoxes() {
 export async function getBoxById(id: string) {
   const store = await ensureStore()
   return store.boxes.find((box) => box.id === id) ?? null
+}
+
+export async function getBoxSettings(): Promise<BoxSettings> {
+  const store = await ensureStore()
+  return store.settings
 }
 
 export async function createBox(input: CreateBoxInput) {
@@ -56,7 +37,7 @@ export async function createBox(input: CreateBoxInput) {
   }
 
   const timestamp = new Date().toISOString()
-  const box: BoxRecord = {
+  const box = {
     id: randomUUID(),
     code: normalized.code,
     name: normalized.name,
@@ -112,6 +93,22 @@ export async function updateBox(input: UpdateBoxInput) {
   return box
 }
 
+export async function setActiveScanningBox(input: SetActiveScanningBoxInput) {
+  const store = await ensureStore()
+
+  if (input.boxId !== null) {
+    const box = store.boxes.find((entry) => entry.id === input.boxId)
+    if (!box) {
+      throw new BoxError('BOX_NOT_FOUND', 'Box not found')
+    }
+  }
+
+  store.settings.activeScanningBoxId = input.boxId
+  await saveStore(store)
+
+  return store.settings
+}
+
 export async function deleteBox(id: string) {
   const store = await ensureStore()
   const index = store.boxes.findIndex((box) => box.id === id)
@@ -121,6 +118,12 @@ export async function deleteBox(id: string) {
   }
 
   const [removed] = store.boxes.splice(index, 1)
+  store.cards = store.cards.filter((card) => card.boxId !== id)
+
+  if (store.settings.activeScanningBoxId === id) {
+    store.settings.activeScanningBoxId = null
+  }
+
   await saveStore(store)
   return removed
 }

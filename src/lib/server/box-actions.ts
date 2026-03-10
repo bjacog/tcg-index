@@ -1,6 +1,19 @@
 import { createServerFn } from '@tanstack/react-start'
-import { BoxError, type CreateBoxInput, type UpdateBoxInput } from '../boxes'
-import { createBox, deleteBox, getBoxById, listBoxes, updateBox } from './box-repository'
+import {
+  BoxError,
+  type CreateBoxInput,
+  type SetActiveScanningBoxInput,
+  type UpdateBoxInput,
+} from '../boxes'
+import {
+  createBox,
+  deleteBox,
+  getBoxById,
+  getBoxSettings,
+  listBoxes,
+  setActiveScanningBox,
+  updateBox,
+} from './box-repository'
 
 function mapError(error: unknown): never {
   if (error instanceof BoxError) {
@@ -15,7 +28,7 @@ export const listBoxesFn = createServerFn({ method: 'GET' }).handler(async () =>
 })
 
 export const getBoxByIdFn = createServerFn({ method: 'GET' })
-  .validator((id: string) => id)
+  .inputValidator((id: string) => id)
   .handler(async ({ data }) => {
     const box = await getBoxById(data)
     if (!box) {
@@ -24,8 +37,12 @@ export const getBoxByIdFn = createServerFn({ method: 'GET' })
     return box
   })
 
+export const getBoxSettingsFn = createServerFn({ method: 'GET' }).handler(async () => {
+  return getBoxSettings()
+})
+
 export const createBoxFn = createServerFn({ method: 'POST' })
-  .validator((input: CreateBoxInput) => input)
+  .inputValidator((input: CreateBoxInput) => input)
   .handler(async ({ data }) => {
     try {
       return await createBox(data)
@@ -35,7 +52,7 @@ export const createBoxFn = createServerFn({ method: 'POST' })
   })
 
 export const updateBoxFn = createServerFn({ method: 'POST' })
-  .validator((input: UpdateBoxInput) => input)
+  .inputValidator((input: UpdateBoxInput) => input)
   .handler(async ({ data }) => {
     try {
       return await updateBox(data)
@@ -44,8 +61,18 @@ export const updateBoxFn = createServerFn({ method: 'POST' })
     }
   })
 
+export const setActiveScanningBoxFn = createServerFn({ method: 'POST' })
+  .inputValidator((input: SetActiveScanningBoxInput) => input)
+  .handler(async ({ data }) => {
+    try {
+      return await setActiveScanningBox(data)
+    } catch (error) {
+      mapError(error)
+    }
+  })
+
 export const deleteBoxFn = createServerFn({ method: 'POST' })
-  .validator((id: string) => id)
+  .inputValidator((id: string) => id)
   .handler(async ({ data }) => {
     try {
       return await deleteBox(data)

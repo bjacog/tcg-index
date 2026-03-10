@@ -1,11 +1,18 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, createFileRoute, notFound, useNavigate, useRouter } from '@tanstack/react-router'
-import { deleteBoxFn, getBoxByIdFn, updateBoxFn } from '../lib/server/box-actions'
+import { listCardsForBoxFn } from '../lib/server/card-actions'
+import { deleteBoxFn, getBoxByIdFn, getBoxSettingsFn, setActiveScanningBoxFn, updateBoxFn } from '../lib/server/box-actions'
 
 export const Route = createFileRoute('/boxes/$boxId')({
   loader: async ({ params }) => {
     try {
-      return await getBoxByIdFn({ data: params.boxId })
+      const [box, cards, settings] = await Promise.all([
+        getBoxByIdFn({ data: params.boxId }),
+        listCardsForBoxFn({ data: params.boxId }),
+        getBoxSettingsFn(),
+      ])
+
+      return { box, cards, settings }
     } catch {
       throw notFound()
     }
@@ -14,7 +21,7 @@ export const Route = createFileRoute('/boxes/$boxId')({
 })
 
 function BoxDetailPage() {
-  const box = Route.useLoaderData()
+  const { box, cards, settings } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [form, setForm] = useState({
@@ -26,6 +33,13 @@ function BoxDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isTogglingActive, setIsTogglingActive] = useState(false)
+
+  const isActiveScanningBox = settings.activeScanningBoxId === box.id
+  const webhookUrl = useMemo(() => {
+    if (typeof window === 'undefined') return '/api/delver-webhook'
+    return `${window.location.origin}/api/delver-webhook`
+  }, [])
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -48,7 +62,7 @@ function BoxDetailPage() {
   }
 
   async function handleDelete() {
-    const confirmed = window.confirm(`Delete ${box.code}?`)
+    const confirmed = window.confirm(`Delete ${box.code}? This also removes its indexed cards.`)
     if (!confirmed) return
 
     setError(null)
@@ -64,7 +78,23 @@ function BoxDetailPage() {
     }
   }
 
-  const cards: Array<{ position: number; cardName: string; setName: string; finish: string; condition: string }> = []
+  async function handleToggleActiveScanning() {
+    setError(null)
+    setIsTogglingActive(true)
+
+    try {
+      await setActiveScanningBoxFn({
+        data: {
+          boxId: isActiveScanningBox ? null : box.id,
+        },
+      })
+      await router.invalidate()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Failed to update scanning box')
+    } finally {
+      setIsTogglingActive(false)
+    }
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
@@ -75,13 +105,18 @@ function BoxDetailPage() {
           </Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">{box.code}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Ordered contents for this box. Adding at a position inserts and shifts. Removing collapses following positions.
+            Ordered contents for this box. Delver scans append to the end when this is the active scanning box.
           </p>
         </div>
 
         <div className="flex flex-wrap gap-3">
-          <button className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium dark:border-slate-700">
-            Insert card
+          <button
+            type="button"
+            onClick={handleToggleActiveScanning}
+            disabled={isTogglingActive}
+            className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+          >
+            {isTogglingActive ? 'Updating…' : isActiveScanningBox ? 'Unset active scanner box' : 'Set as active scanner box'}
           </button>
           <Link
             to="/boxes/$boxId/scan"
@@ -92,6 +127,27 @@ function BoxDetailPage() {
           </Link>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Delver webhook</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              Point Delver at this endpoint. New scanned cards will append to this box only while it is active.
+            </p>
+          </div>
+          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanningBox ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+            {isActiveScanningBox ? 'Active for scanning' : 'Inactive'}
+          </span>
+        </div>
+        <div className="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Webhook endpoint</p>
+          <code className="mt-2 block break-all text-sm">{webhookUrl}</code>
+          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+            Supports POST + OPTIONS for Delver and a simple GET status check in the browser.
+          </p>
+        </div>
+      </section>
 
       <section className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
         <form
@@ -164,17 +220,26 @@ function BoxDetailPage() {
                 <th className="px-4 py-3 font-medium">Set</th>
                 <th className="px-4 py-3 font-medium">Finish</th>
                 <th className="px-4 py-3 font-medium">Condition</th>
-                <th className="px-4 py-3 font-medium">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {cards.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
                     No cards in this box yet.
                   </td>
                 </tr>
-              ) : null}
+              ) : (
+                cards.map((card) => (
+                  <tr key={card.id}>
+                    <td className="px-4 py-4 text-sm font-medium">{card.position}</td>
+                    <td className="px-4 py-4 text-sm">{card.name}</td>
+                    <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">{card.edition || '—'}</td>
+                    <td className="px-4 py-4 text-sm">{card.finish || '—'}</td>
+                    <td className="px-4 py-4 text-sm">{card.condition || '—'}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </section>

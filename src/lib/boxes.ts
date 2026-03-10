@@ -8,6 +8,12 @@ export type BoxRecord = {
   updatedAt: string
 }
 
+export type BoxSettings = {
+  activeScanningBoxId: string | null
+  lastWebhookEventAt: string | null
+  lastWebhookEventType: string | null
+}
+
 export type CreateBoxInput = {
   code: string
   name: string
@@ -21,6 +27,10 @@ export type UpdateBoxInput = {
   name?: string
   description?: string
   locationNote?: string
+}
+
+export type SetActiveScanningBoxInput = {
+  boxId: string | null
 }
 
 export class BoxError extends Error {
