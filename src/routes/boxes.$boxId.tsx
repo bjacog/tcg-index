@@ -26,6 +26,14 @@ export const Route = createFileRoute('/boxes/$boxId')({
   component: BoxDetailPage,
 })
 
+function scryfallImageUrl(scryfallId: string) {
+  if (!scryfallId) {
+    return null
+  }
+
+  return `https://cards.scryfall.io/normal/front/${scryfallId[0]}/${scryfallId[1]}/${scryfallId}.jpg`
+}
+
 function BoxDetailPage() {
   const { box, cards, settings } = Route.useLoaderData()
   const router = useRouter()
@@ -111,8 +119,8 @@ function BoxDetailPage() {
           </Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">{box.code}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Ordered contents for this box. Delver scans append to the end when this is the active
-            scanning box.
+            Ordered contents for this box. Hover a card name to preview its image when a Scryfall ID
+            is available.
           </p>
         </div>
 
@@ -235,7 +243,14 @@ function BoxDetailPage() {
           </div>
         </form>
 
-        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
+            <h2 className="text-lg font-semibold">Cards in this box</h2>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {cards.length} {cards.length === 1 ? 'card' : 'cards'} indexed in order.
+            </p>
+          </div>
+
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
             <thead className="bg-slate-50 dark:bg-slate-950/60">
               <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
@@ -257,17 +272,38 @@ function BoxDetailPage() {
                   </td>
                 </tr>
               ) : (
-                cards.map((card) => (
-                  <tr key={card.id}>
-                    <td className="px-4 py-4 text-sm font-medium">{card.position}</td>
-                    <td className="px-4 py-4 text-sm">{card.name}</td>
-                    <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
-                      {card.edition || '—'}
-                    </td>
-                    <td className="px-4 py-4 text-sm">{card.finish || '—'}</td>
-                    <td className="px-4 py-4 text-sm">{card.condition || '—'}</td>
-                  </tr>
-                ))
+                cards.map((card) => {
+                  const imageUrl = scryfallImageUrl(card.scryfallId)
+
+                  return (
+                    <tr key={card.id}>
+                      <td className="px-4 py-4 text-sm font-medium">{card.position}</td>
+                      <td className="px-4 py-4 text-sm">
+                        <div className="group relative inline-flex items-center">
+                          <span className="cursor-default underline decoration-dotted underline-offset-4">
+                            {card.name}
+                          </span>
+
+                          {imageUrl ? (
+                            <div className="pointer-events-none absolute left-full top-1/2 z-20 ml-4 hidden -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl group-hover:block dark:border-slate-800 dark:bg-slate-900">
+                              <img
+                                src={imageUrl}
+                                alt={card.name}
+                                className="h-auto w-64 max-w-none rounded-xl"
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
+                        {card.edition || '—'}
+                      </td>
+                      <td className="px-4 py-4 text-sm">{card.finish || '—'}</td>
+                      <td className="px-4 py-4 text-sm">{card.condition || '—'}</td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
