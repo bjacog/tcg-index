@@ -14,3 +14,4 @@ todos.json
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
+certs/

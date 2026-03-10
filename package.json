@@ -7,13 +7,15 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
+    "dev:https": "vite dev --port 3000 --host",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
-    "format:check": "prettier . --check"
+    "format:check": "prettier . --check",
+    "cert:generate": "bash ./scripts/generate-local-cert.sh"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.18",
