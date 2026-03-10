@@ -100,7 +100,16 @@ function PickListPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-2">
+        {missingCards.length > 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
+              Cards not found in any box
+            </p>
+            <p className="mt-1 text-amber-800 dark:text-amber-300">{missingCards.join(', ')}</p>
+          </div>
+        ) : null}
+
+        <div className={`flex flex-col gap-2 ${missingCards.length > 0 ? 'mt-6' : ''}`}>
           <h2 className="text-lg font-semibold">Results by box</h2>
           <p className="text-sm text-slate-600 dark:text-slate-300">
             {results.length === 0
@@ -108,13 +117,6 @@ function PickListPage() {
               : `${results.length} matching box${results.length === 1 ? '' : 'es'} found.`}
           </p>
         </div>
-
-        {missingCards.length > 0 ? (
-          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
-            <p className="font-medium text-amber-900 dark:text-amber-200">Not found</p>
-            <p className="mt-1 text-amber-800 dark:text-amber-300">{missingCards.join(', ')}</p>
-          </div>
-        ) : null}
 
         <div className="mt-4 space-y-4">
           {results.length === 0 ? (
