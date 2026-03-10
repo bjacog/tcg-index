@@ -4,20 +4,20 @@ import { searchCardsByExactNamesFn } from '../lib/server/card-actions'
 
 export const Route = createFileRoute('/pick-list')({ component: PickListPage })
 
-type PickListBoxGroup = {
-  box: string
+type PickListCardEntry = {
+  name: string
   positions: Array<string | number>
 }
 
-type PickListGroup = {
-  requested: string
-  status: string
-  boxes: PickListBoxGroup[]
+type PickListBoxGroup = {
+  box: string
+  cards: PickListCardEntry[]
 }
 
 function PickListPage() {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<PickListGroup[]>([])
+  const [results, setResults] = useState<PickListBoxGroup[]>([])
+  const [missingCards, setMissingCards] = useState<string[]>([])
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -36,41 +36,39 @@ function PickListPage() {
 
     try {
       const matches = await searchCardsByExactNamesFn({ data: requestedNames })
-      const nextResults = requestedNames.map((requested) => {
-        const cardMatches = matches.filter(
-          (entry) => entry.name.toLowerCase() === requested.toLowerCase(),
-        )
+      const lowerRequested = requestedNames.map((name) => name.toLowerCase())
+      const foundNames = new Set(matches.map((entry) => entry.name.toLowerCase()))
 
-        if (cardMatches.length === 0) {
-          return {
-            requested,
-            status: 'Not found',
-            boxes: [],
-          }
-        }
-
-        const boxesMap = new Map<string, Array<string | number>>()
-
-        for (const match of cardMatches) {
-          const box = `${match.boxCode} · ${match.boxName}`
-          const currentPositions = boxesMap.get(box) ?? []
-          currentPositions.push(match.position)
-          boxesMap.set(box, currentPositions)
-        }
-
-        const boxGroups = Array.from(boxesMap.entries()).map(([box, positions]) => ({
-          box,
-          positions: positions.sort((a, b) => Number(a) - Number(b)),
-        }))
-
-        return {
-          requested,
-          status: `Found in ${cardMatches.length} location${cardMatches.length === 1 ? '' : 's'} across ${boxGroups.length} box${boxGroups.length === 1 ? '' : 'es'}`,
-          boxes: boxGroups,
-        }
+      const nextMissingCards = requestedNames.filter((requested, index) => {
+        const lowered = lowerRequested[index]
+        return !foundNames.has(lowered)
       })
 
+      const boxesMap = new Map<string, Map<string, Array<string | number>>>()
+
+      for (const match of matches) {
+        const box = `${match.boxCode} · ${match.boxName}`
+        const existingBoxGroup = boxesMap.get(box) ?? new Map<string, Array<string | number>>()
+        const existingPositions = existingBoxGroup.get(match.name) ?? []
+        existingPositions.push(match.position)
+        existingBoxGroup.set(match.name, existingPositions)
+        boxesMap.set(box, existingBoxGroup)
+      }
+
+      const nextResults = Array.from(boxesMap.entries())
+        .map(([box, cardMap]) => ({
+          box,
+          cards: Array.from(cardMap.entries())
+            .map(([name, positions]) => ({
+              name,
+              positions: positions.sort((a, b) => Number(a) - Number(b)),
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        }))
+        .sort((a, b) => a.box.localeCompare(b.box))
+
       setResults(nextResults)
+      setMissingCards(nextMissingCards)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Failed to search cards')
     } finally {
@@ -86,7 +84,8 @@ function PickListPage() {
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Bulk search</h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Paste one exact card name per line to find every indexed match and its box position.
+          Paste one exact card name per line to group the requested cards by the boxes that contain
+          them.
         </p>
         <textarea
           value={query}
@@ -105,39 +104,51 @@ function PickListPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <h2 className="text-lg font-semibold">Results</h2>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold">Results by box</h2>
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {results.length === 0
+              ? 'No pick list generated yet.'
+              : `${results.length} matching box${results.length === 1 ? '' : 'es'} found.`}
+          </p>
+        </div>
+
+        {missingCards.length > 0 ? (
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
+            <p className="font-medium text-amber-900 dark:text-amber-200">Not found</p>
+            <p className="mt-1 text-amber-800 dark:text-amber-300">{missingCards.join(', ')}</p>
+          </div>
+        ) : null}
+
         <div className="mt-4 space-y-4">
           {results.length === 0 ? (
             <div className="rounded-2xl border border-slate-200 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
-              No pick list generated yet.
+              No matching boxes yet.
             </div>
           ) : (
             results.map((result) => (
               <section
-                key={result.requested}
+                key={result.box}
                 className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800"
               >
-                <div className="flex flex-col gap-1 bg-slate-50 px-4 py-4 dark:bg-slate-950/60">
-                  <h3 className="text-base font-semibold">{result.requested}</h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-300">{result.status}</p>
+                <div className="bg-slate-50 px-4 py-4 dark:bg-slate-950/60">
+                  <h3 className="text-base font-semibold">{result.box}</h3>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                    {result.cards.length} requested card{result.cards.length === 1 ? '' : 's'} in
+                    this box
+                  </p>
                 </div>
 
-                {result.boxes.length === 0 ? (
-                  <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
-                    No indexed copies found.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {result.boxes.map((boxGroup) => (
-                      <div key={`${result.requested}-${boxGroup.box}`} className="px-4 py-4">
-                        <div className="text-sm font-medium">{boxGroup.box}</div>
-                        <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                          Positions: {boxGroup.positions.join(', ')}
-                        </div>
+                <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                  {result.cards.map((card) => (
+                    <div key={`${result.box}-${card.name}`} className="px-4 py-4">
+                      <div className="text-sm font-medium">{card.name}</div>
+                      <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                        Positions: {card.positions.join(', ')}
                       </div>
-                    ))}
-                  </div>
-                )}
+                    </div>
+                  ))}
+                </div>
               </section>
             ))
           )}
