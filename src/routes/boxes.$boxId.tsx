@@ -1,7 +1,13 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { listCardsForBoxFn } from '../lib/server/card-actions'
-import { deleteBoxFn, getBoxByIdFn, getBoxSettingsFn, setActiveScanningBoxFn, updateBoxFn } from '../lib/server/box-actions'
+import {
+  deleteBoxFn,
+  getBoxByIdFn,
+  getBoxSettingsFn,
+  setActiveScanningBoxFn,
+  updateBoxFn,
+} from '../lib/server/box-actions'
 
 export const Route = createFileRoute('/boxes/$boxId')({
   loader: async ({ params }) => {
@@ -105,7 +111,8 @@ function BoxDetailPage() {
           </Link>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">{box.code}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Ordered contents for this box. Delver scans append to the end when this is the active scanning box.
+            Ordered contents for this box. Delver scans append to the end when this is the active
+            scanning box.
           </p>
         </div>
 
@@ -116,7 +123,11 @@ function BoxDetailPage() {
             disabled={isTogglingActive}
             className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
           >
-            {isTogglingActive ? 'Updating…' : isActiveScanningBox ? 'Unset active scanner box' : 'Set as active scanner box'}
+            {isTogglingActive
+              ? 'Updating…'
+              : isActiveScanningBox
+                ? 'Unset active scanner box'
+                : 'Set as active scanner box'}
           </button>
           <Link
             to="/boxes/$boxId/scan"
@@ -133,15 +144,20 @@ function BoxDetailPage() {
           <div>
             <h2 className="text-lg font-semibold">Delver webhook</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Point Delver at this endpoint. New scanned cards will append to this box only while it is active.
+              Point Delver at this endpoint. New scanned cards will append to this box only while it
+              is active.
             </p>
           </div>
-          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanningBox ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}>
+          <span
+            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanningBox ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+          >
             {isActiveScanningBox ? 'Active for scanning' : 'Inactive'}
           </span>
         </div>
         <div className="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Webhook endpoint</p>
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+            Webhook endpoint
+          </p>
           <code className="mt-2 block break-all text-sm">{webhookUrl}</code>
           <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
             Supports POST + OPTIONS for Delver and a simple GET status check in the browser.
@@ -160,7 +176,9 @@ function BoxDetailPage() {
               <span className="mb-1 block font-medium">Code</span>
               <input
                 value={form.code}
-                onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, code: event.target.value }))
+                }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
@@ -168,7 +186,9 @@ function BoxDetailPage() {
               <span className="mb-1 block font-medium">Name</span>
               <input
                 value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, name: event.target.value }))
+                }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
@@ -176,7 +196,9 @@ function BoxDetailPage() {
               <span className="mb-1 block font-medium">Description</span>
               <textarea
                 value={form.description}
-                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, description: event.target.value }))
+                }
                 className="min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
@@ -184,7 +206,9 @@ function BoxDetailPage() {
               <span className="mb-1 block font-medium">Location note</span>
               <input
                 value={form.locationNote}
-                onChange={(event) => setForm((current) => ({ ...current, locationNote: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, locationNote: event.target.value }))
+                }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
               />
             </label>
@@ -225,7 +249,10 @@ function BoxDetailPage() {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {cards.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td
+                    colSpan={5}
+                    className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                  >
                     No cards in this box yet.
                   </td>
                 </tr>
@@ -234,7 +261,9 @@ function BoxDetailPage() {
                   <tr key={card.id}>
                     <td className="px-4 py-4 text-sm font-medium">{card.position}</td>
                     <td className="px-4 py-4 text-sm">{card.name}</td>
-                    <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">{card.edition || '—'}</td>
+                    <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
+                      {card.edition || '—'}
+                    </td>
                     <td className="px-4 py-4 text-sm">{card.finish || '—'}</td>
                     <td className="px-4 py-4 text-sm">{card.condition || '—'}</td>
                   </tr>

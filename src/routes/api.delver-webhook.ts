@@ -51,7 +51,9 @@ export const Route = createFileRoute('/api/delver-webhook')({
             )
           } catch (error) {
             if (error instanceof CardError) {
-              return withCors(json({ ok: false, error: error.code, message: error.message }, { status: 409 }))
+              return withCors(
+                json({ ok: false, error: error.code, message: error.message }, { status: 409 }),
+              )
             }
             throw error
           }

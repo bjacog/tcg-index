@@ -17,7 +17,11 @@ const dataDirectory = path.resolve(process.cwd(), 'data')
 const dataFilePath = path.join(dataDirectory, 'boxes.json')
 
 function normalizeStoreShape(input: unknown): AppStore {
-  const parsed = (input ?? {}) as Partial<AppStore> & { boxes?: unknown; cards?: unknown; settings?: unknown }
+  const parsed = (input ?? {}) as Partial<AppStore> & {
+    boxes?: unknown
+    cards?: unknown
+    settings?: unknown
+  }
   const rawSettings = (parsed.settings ?? {}) as Partial<AppStore['settings']>
 
   return {

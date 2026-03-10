@@ -63,8 +63,10 @@ export async function updateBox(input: UpdateBoxInput) {
 
   const nextCode = input.code === undefined ? box.code : input.code.trim()
   const nextName = input.name === undefined ? box.name : input.name.trim()
-  const nextDescription = input.description === undefined ? box.description : input.description.trim()
-  const nextLocationNote = input.locationNote === undefined ? box.locationNote : input.locationNote.trim()
+  const nextDescription =
+    input.description === undefined ? box.description : input.description.trim()
+  const nextLocationNote =
+    input.locationNote === undefined ? box.locationNote : input.locationNote.trim()
 
   if (!nextCode) {
     throw new BoxError('VALIDATION_ERROR', 'Box code is required')

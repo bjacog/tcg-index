@@ -30,8 +30,8 @@ function DashboardPage() {
         </p>
         <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">TCG Index</h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Local-first trading card indexing for ordered boxes, mobile scanning,
-          and pick-list generation.
+          Local-first trading card indexing for ordered boxes, mobile scanning, and pick-list
+          generation.
         </p>
       </section>
 
@@ -63,9 +63,7 @@ function DashboardPage() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {action.title}
             </h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              {action.description}
-            </p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{action.description}</p>
           </Link>
         ))}
       </section>

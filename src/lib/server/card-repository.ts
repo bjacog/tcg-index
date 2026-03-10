@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto'
-import { CardError, normalizeCardName, type CardRecord, type CardSearchResult, type DelverScannedCard } from '../cards'
+import {
+  CardError,
+  normalizeCardName,
+  type CardRecord,
+  type CardSearchResult,
+  type DelverScannedCard,
+} from '../cards'
 import { ensureStore, saveStore } from './store'
 
 export async function listCardsForBox(boxId: string) {
@@ -23,7 +29,12 @@ export async function searchCardsByExactNames(names: string[]): Promise<CardSear
         boxName: box?.name ?? 'Unknown box',
       }
     })
-    .sort((a, b) => a.name.localeCompare(b.name) || a.boxCode.localeCompare(b.boxCode) || a.position - b.position)
+    .sort(
+      (a, b) =>
+        a.name.localeCompare(b.name) ||
+        a.boxCode.localeCompare(b.boxCode) ||
+        a.position - b.position,
+    )
 }
 
 export async function appendScannedCardsToActiveBox(scannedCards: DelverScannedCard[]) {

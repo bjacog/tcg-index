@@ -39,9 +39,15 @@ function BoxScanPage() {
 
       <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex flex-wrap gap-3">
-          <button className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white">Confirm add</button>
-          <button className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium dark:border-slate-700">Retry detection</button>
-          <button className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium dark:border-slate-700">Adjust index</button>
+          <button className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white">
+            Confirm add
+          </button>
+          <button className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium dark:border-slate-700">
+            Retry detection
+          </button>
+          <button className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium dark:border-slate-700">
+            Adjust index
+          </button>
         </div>
       </section>
     </div>

@@ -18,7 +18,11 @@ function PickListPage() {
   const [error, setError] = useState<string | null>(null)
 
   const requestedNames = useMemo(
-    () => query.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
+    () =>
+      query
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean),
     [query],
   )
 
@@ -96,7 +100,10 @@ function PickListPage() {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {results.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                  >
                     No pick list generated yet.
                   </td>
                 </tr>

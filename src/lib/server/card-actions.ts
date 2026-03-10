@@ -1,6 +1,10 @@
 import { createServerFn } from '@tanstack/react-start'
 import { CardError } from '../cards'
-import { appendScannedCardsToActiveBox, listCardsForBox, searchCardsByExactNames } from './card-repository'
+import {
+  appendScannedCardsToActiveBox,
+  listCardsForBox,
+  searchCardsByExactNames,
+} from './card-repository'
 
 function mapError(error: unknown): never {
   if (error instanceof CardError) {

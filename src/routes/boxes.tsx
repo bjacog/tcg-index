@@ -55,7 +55,9 @@ function BoxesPage() {
               <span className="mb-1 block font-medium">Code</span>
               <input
                 value={form.code}
-                onChange={(event) => setForm((current) => ({ ...current, code: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, code: event.target.value }))
+                }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
                 placeholder="BOX-001"
               />
@@ -64,7 +66,9 @@ function BoxesPage() {
               <span className="mb-1 block font-medium">Name</span>
               <input
                 value={form.name}
-                onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, name: event.target.value }))
+                }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
                 placeholder="Commander Staples"
               />
@@ -73,7 +77,9 @@ function BoxesPage() {
               <span className="mb-1 block font-medium">Description</span>
               <textarea
                 value={form.description}
-                onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, description: event.target.value }))
+                }
                 className="min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
                 placeholder="Optional notes"
               />
@@ -82,7 +88,9 @@ function BoxesPage() {
               <span className="mb-1 block font-medium">Location note</span>
               <input
                 value={form.locationNote}
-                onChange={(event) => setForm((current) => ({ ...current, locationNote: event.target.value }))}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, locationNote: event.target.value }))
+                }
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
                 placeholder="Shelf 2"
               />
@@ -111,7 +119,10 @@ function BoxesPage() {
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {boxes.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
+                  <td
+                    colSpan={4}
+                    className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
+                  >
                     No boxes yet. Create the first one on the left.
                   </td>
                 </tr>
@@ -125,10 +136,18 @@ function BoxesPage() {
                     </td>
                     <td className="px-4 py-4 text-sm">
                       <div className="flex flex-wrap gap-3">
-                        <Link to="/boxes/$boxId" params={{ boxId: box.id }} className="text-emerald-700 dark:text-emerald-400">
+                        <Link
+                          to="/boxes/$boxId"
+                          params={{ boxId: box.id }}
+                          className="text-emerald-700 dark:text-emerald-400"
+                        >
                           Open
                         </Link>
-                        <Link to="/boxes/$boxId/scan" params={{ boxId: box.id }} className="text-slate-600 dark:text-slate-300">
+                        <Link
+                          to="/boxes/$boxId/scan"
+                          params={{ boxId: box.id }}
+                          className="text-slate-600 dark:text-slate-300"
+                        >
                           Scan
                         </Link>
                       </div>

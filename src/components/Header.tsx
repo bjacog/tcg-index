@@ -24,7 +24,10 @@ export default function Header() {
               key={item.to}
               to={item.to}
               className="text-sm font-medium text-slate-600 no-underline transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
-              activeProps={{ className: 'text-sm font-medium text-emerald-700 no-underline dark:text-emerald-400' }}
+              activeProps={{
+                className:
+                  'text-sm font-medium text-emerald-700 no-underline dark:text-emerald-400',
+              }}
             >
               {item.label}
             </Link>
