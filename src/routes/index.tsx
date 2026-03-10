@@ -1,8 +1,8 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { listBoxesFn } from '../lib/server/box-actions'
+import { getDashboardStatsFn } from '../lib/server/pick-list-actions'
 
 export const Route = createFileRoute('/')({
-  loader: () => listBoxesFn(),
+  loader: () => getDashboardStatsFn(),
   component: DashboardPage,
 })
 
@@ -13,14 +13,14 @@ const quickActions = [
     to: '/boxes',
   },
   {
-    title: 'Pick List',
-    description: 'Paste a list of cards and find their box + position.',
-    to: '/pick-list',
+    title: 'Pick Lists',
+    description: 'Browse saved pick lists and generate new ones.',
+    to: '/pick-lists',
   },
 ]
 
 function DashboardPage() {
-  const boxes = Route.useLoaderData()
+  const stats = Route.useLoaderData()
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 px-4 py-8 sm:px-6 sm:py-10">
@@ -37,9 +37,13 @@ function DashboardPage() {
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {[
-          ['Boxes', String(boxes.length), 'Storage containers'],
-          ['Indexed cards', '0', 'Single-card entries'],
-          ['Pick lists', '—', 'Bulk search workflow'],
+          ['Boxes', String(stats.boxCount), 'Storage containers'],
+          [
+            'Indexed cards',
+            String(stats.indexedCardCount),
+            `${stats.uniqueCardNameCount} unique by name`,
+          ],
+          ['Pick lists', String(stats.pickListCount), 'Saved pick-list history'],
           ['Scan sessions', '—', 'Box-context mobile flow'],
         ].map(([label, value, hint]) => (
           <div

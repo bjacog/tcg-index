@@ -9,15 +9,23 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as PickListsRouteImport } from './routes/pick-lists'
 import { Route as PickListRouteImport } from './routes/pick-list'
 import { Route as BoxesRouteImport } from './routes/boxes'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PickListsIndexRouteImport } from './routes/pick-lists.index'
 import { Route as BoxesIndexRouteImport } from './routes/boxes.index'
+import { Route as PickListsPickListIdRouteImport } from './routes/pick-lists.$pickListId'
 import { Route as BoxesBoxIdRouteImport } from './routes/boxes.$boxId'
 import { Route as ApiDelverWebhookRouteImport } from './routes/api.delver-webhook'
 import { Route as ApiDelverPollRouteImport } from './routes/api.delver-poll'
 import { Route as BoxesBoxIdScanRouteImport } from './routes/boxes.$boxId.scan'
 
+const PickListsRoute = PickListsRouteImport.update({
+  id: '/pick-lists',
+  path: '/pick-lists',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PickListRoute = PickListRouteImport.update({
   id: '/pick-list',
   path: '/pick-list',
@@ -33,10 +41,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PickListsIndexRoute = PickListsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PickListsRoute,
+} as any)
 const BoxesIndexRoute = BoxesIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => BoxesRoute,
+} as any)
+const PickListsPickListIdRoute = PickListsPickListIdRouteImport.update({
+  id: '/$pickListId',
+  path: '/$pickListId',
+  getParentRoute: () => PickListsRoute,
 } as any)
 const BoxesBoxIdRoute = BoxesBoxIdRouteImport.update({
   id: '/$boxId',
@@ -63,10 +81,13 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/boxes': typeof BoxesRouteWithChildren
   '/pick-list': typeof PickListRoute
+  '/pick-lists': typeof PickListsRouteWithChildren
   '/api/delver-poll': typeof ApiDelverPollRoute
   '/api/delver-webhook': typeof ApiDelverWebhookRoute
   '/boxes/$boxId': typeof BoxesBoxIdRouteWithChildren
+  '/pick-lists/$pickListId': typeof PickListsPickListIdRoute
   '/boxes/': typeof BoxesIndexRoute
+  '/pick-lists/': typeof PickListsIndexRoute
   '/boxes/$boxId/scan': typeof BoxesBoxIdScanRoute
 }
 export interface FileRoutesByTo {
@@ -75,7 +96,9 @@ export interface FileRoutesByTo {
   '/api/delver-poll': typeof ApiDelverPollRoute
   '/api/delver-webhook': typeof ApiDelverWebhookRoute
   '/boxes/$boxId': typeof BoxesBoxIdRouteWithChildren
+  '/pick-lists/$pickListId': typeof PickListsPickListIdRoute
   '/boxes': typeof BoxesIndexRoute
+  '/pick-lists': typeof PickListsIndexRoute
   '/boxes/$boxId/scan': typeof BoxesBoxIdScanRoute
 }
 export interface FileRoutesById {
@@ -83,10 +106,13 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/boxes': typeof BoxesRouteWithChildren
   '/pick-list': typeof PickListRoute
+  '/pick-lists': typeof PickListsRouteWithChildren
   '/api/delver-poll': typeof ApiDelverPollRoute
   '/api/delver-webhook': typeof ApiDelverWebhookRoute
   '/boxes/$boxId': typeof BoxesBoxIdRouteWithChildren
+  '/pick-lists/$pickListId': typeof PickListsPickListIdRoute
   '/boxes/': typeof BoxesIndexRoute
+  '/pick-lists/': typeof PickListsIndexRoute
   '/boxes/$boxId/scan': typeof BoxesBoxIdScanRoute
 }
 export interface FileRouteTypes {
@@ -95,10 +121,13 @@ export interface FileRouteTypes {
     | '/'
     | '/boxes'
     | '/pick-list'
+    | '/pick-lists'
     | '/api/delver-poll'
     | '/api/delver-webhook'
     | '/boxes/$boxId'
+    | '/pick-lists/$pickListId'
     | '/boxes/'
+    | '/pick-lists/'
     | '/boxes/$boxId/scan'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -107,17 +136,22 @@ export interface FileRouteTypes {
     | '/api/delver-poll'
     | '/api/delver-webhook'
     | '/boxes/$boxId'
+    | '/pick-lists/$pickListId'
     | '/boxes'
+    | '/pick-lists'
     | '/boxes/$boxId/scan'
   id:
     | '__root__'
     | '/'
     | '/boxes'
     | '/pick-list'
+    | '/pick-lists'
     | '/api/delver-poll'
     | '/api/delver-webhook'
     | '/boxes/$boxId'
+    | '/pick-lists/$pickListId'
     | '/boxes/'
+    | '/pick-lists/'
     | '/boxes/$boxId/scan'
   fileRoutesById: FileRoutesById
 }
@@ -125,12 +159,20 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BoxesRoute: typeof BoxesRouteWithChildren
   PickListRoute: typeof PickListRoute
+  PickListsRoute: typeof PickListsRouteWithChildren
   ApiDelverPollRoute: typeof ApiDelverPollRoute
   ApiDelverWebhookRoute: typeof ApiDelverWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/pick-lists': {
+      id: '/pick-lists'
+      path: '/pick-lists'
+      fullPath: '/pick-lists'
+      preLoaderRoute: typeof PickListsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pick-list': {
       id: '/pick-list'
       path: '/pick-list'
@@ -152,12 +194,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pick-lists/': {
+      id: '/pick-lists/'
+      path: '/'
+      fullPath: '/pick-lists/'
+      preLoaderRoute: typeof PickListsIndexRouteImport
+      parentRoute: typeof PickListsRoute
+    }
     '/boxes/': {
       id: '/boxes/'
       path: '/'
       fullPath: '/boxes/'
       preLoaderRoute: typeof BoxesIndexRouteImport
       parentRoute: typeof BoxesRoute
+    }
+    '/pick-lists/$pickListId': {
+      id: '/pick-lists/$pickListId'
+      path: '/$pickListId'
+      fullPath: '/pick-lists/$pickListId'
+      preLoaderRoute: typeof PickListsPickListIdRouteImport
+      parentRoute: typeof PickListsRoute
     }
     '/boxes/$boxId': {
       id: '/boxes/$boxId'
@@ -214,10 +270,25 @@ const BoxesRouteChildren: BoxesRouteChildren = {
 
 const BoxesRouteWithChildren = BoxesRoute._addFileChildren(BoxesRouteChildren)
 
+interface PickListsRouteChildren {
+  PickListsPickListIdRoute: typeof PickListsPickListIdRoute
+  PickListsIndexRoute: typeof PickListsIndexRoute
+}
+
+const PickListsRouteChildren: PickListsRouteChildren = {
+  PickListsPickListIdRoute: PickListsPickListIdRoute,
+  PickListsIndexRoute: PickListsIndexRoute,
+}
+
+const PickListsRouteWithChildren = PickListsRoute._addFileChildren(
+  PickListsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BoxesRoute: BoxesRouteWithChildren,
   PickListRoute: PickListRoute,
+  PickListsRoute: PickListsRouteWithChildren,
   ApiDelverPollRoute: ApiDelverPollRoute,
   ApiDelverWebhookRoute: ApiDelverWebhookRoute,
 }

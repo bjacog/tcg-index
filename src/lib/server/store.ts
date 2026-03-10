@@ -3,6 +3,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { BoxSettings } from '../boxes'
 import type { CardRecord } from '../cards'
+import type { PickListHistoryRecord } from '../pick-lists'
 
 const dataDirectory = path.resolve(process.cwd(), 'data')
 const databaseFilePath = path.join(dataDirectory, 'tcg-index.sqlite')
@@ -22,6 +23,7 @@ type LegacyStore = {
   }>
   cards?: CardRecord[]
   settings?: Partial<BoxSettings>
+  pickLists?: PickListHistoryRecord[]
 }
 
 type AppSettingKey =
@@ -82,6 +84,16 @@ function getDatabase() {
       key TEXT PRIMARY KEY,
       value TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS pick_lists (
+      id TEXT PRIMARY KEY,
+      created_at TEXT NOT NULL,
+      requested_cards_json TEXT NOT NULL,
+      missing_cards_json TEXT NOT NULL,
+      result_snapshot_json TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_pick_lists_created_at ON pick_lists(created_at DESC);
   `)
 
   seedDefaultSettings(database)
@@ -102,8 +114,10 @@ function seedDefaultSettings(db: DatabaseSync) {
 function migrateLegacyJsonStore(db: DatabaseSync) {
   const hasBoxes = Number(db.prepare('SELECT COUNT(*) as count FROM boxes').get().count) > 0
   const hasCards = Number(db.prepare('SELECT COUNT(*) as count FROM cards').get().count) > 0
+  const hasPickLists =
+    Number(db.prepare('SELECT COUNT(*) as count FROM pick_lists').get().count) > 0
 
-  if (hasBoxes || hasCards || !existsSync(legacyJsonFilePath)) {
+  if (hasBoxes || hasCards || hasPickLists || !existsSync(legacyJsonFilePath)) {
     return
   }
 
@@ -124,6 +138,10 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
   `)
 
   const setSetting = db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)')
+  const insertPickList = db.prepare(`
+    INSERT INTO pick_lists (id, created_at, requested_cards_json, missing_cards_json, result_snapshot_json)
+    VALUES (?, ?, ?, ?, ?)
+  `)
 
   runSqlTransaction(db, () => {
     for (const box of parsed.boxes ?? []) {
@@ -166,6 +184,16 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
     setSetting.run('lastWebhookEventType', parsed.settings?.lastWebhookEventType ?? null)
     setSetting.run('delverPollingEndpoint', parsed.settings?.delverPollingEndpoint ?? null)
     setSetting.run('delverPollingEnabled', parsed.settings?.delverPollingEnabled ? 'true' : 'false')
+
+    for (const pickList of parsed.pickLists ?? []) {
+      insertPickList.run(
+        pickList.id,
+        pickList.createdAt,
+        JSON.stringify(pickList.requestedCards ?? []),
+        JSON.stringify(pickList.missingCards ?? []),
+        JSON.stringify(pickList.resultSnapshot ?? []),
+      )
+    }
   })
 }
 

@@ -4,7 +4,8 @@ import ThemeToggle from './ThemeToggle'
 const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/boxes', label: 'Boxes' },
-  { to: '/pick-list', label: 'Pick List' },
+  { to: '/pick-lists', label: 'Pick Lists' },
+  { to: '/pick-list', label: 'New Pick List' },
 ] as const
 
 export default function Header() {

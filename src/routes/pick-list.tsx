@@ -1,8 +1,14 @@
-import { useMemo, useState } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import { searchCardsByExactNamesFn } from '../lib/server/card-actions'
+import { createPickListHistoryFn } from '../lib/server/pick-list-actions'
 
-export const Route = createFileRoute('/pick-list')({ component: PickListPage })
+export const Route = createFileRoute('/pick-list')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    q: typeof search.q === 'string' ? search.q : '',
+  }),
+  component: PickListPage,
+})
 
 type PickListCardEntry = {
   name: string
@@ -15,11 +21,17 @@ type PickListBoxGroup = {
 }
 
 function PickListPage() {
-  const [query, setQuery] = useState('')
+  const search = Route.useSearch()
+  const [query, setQuery] = useState(search.q || '')
   const [results, setResults] = useState<PickListBoxGroup[]>([])
   const [missingCards, setMissingCards] = useState<string[]>([])
+  const [createdPickListId, setCreatedPickListId] = useState<string | null>(null)
   const [isSearching, setIsSearching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setQuery(search.q || '')
+  }, [search.q])
 
   const requestedNames = useMemo(
     () =>
@@ -33,6 +45,7 @@ function PickListPage() {
   async function handleGeneratePickList() {
     setError(null)
     setIsSearching(true)
+    setCreatedPickListId(null)
 
     try {
       const matches = await searchCardsByExactNamesFn({ data: requestedNames })
@@ -63,8 +76,17 @@ function PickListPage() {
         }))
         .sort((a, b) => a.box.localeCompare(b.box))
 
+      const savedPickList = await createPickListHistoryFn({
+        data: {
+          requestedCards: requestedNames,
+          missingCards: nextMissingCards,
+          resultSnapshot: nextResults,
+        },
+      })
+
       setResults(nextResults)
       setMissingCards(nextMissingCards)
+      setCreatedPickListId(savedPickList.id)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Failed to search cards')
     } finally {
@@ -75,10 +97,17 @@ function PickListPage() {
   return (
     <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)] lg:py-10">
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">
-          Pick list
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Bulk search</h1>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-400">
+              Pick list
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight">New pick list</h1>
+          </div>
+          <Link to="/pick-lists" className="text-sm text-emerald-700 dark:text-emerald-400">
+            View history →
+          </Link>
+        </div>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
           Paste one exact card name per line to group the requested cards by the boxes that contain
           them.
@@ -100,6 +129,19 @@ function PickListPage() {
       </section>
 
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        {createdPickListId ? (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
+            <p className="font-medium text-emerald-900 dark:text-emerald-200">Pick list saved</p>
+            <Link
+              to="/pick-lists/$pickListId"
+              params={{ pickListId: createdPickListId }}
+              className="mt-1 inline-block text-emerald-800 dark:text-emerald-300"
+            >
+              Open saved pick list →
+            </Link>
+          </div>
+        ) : null}
+
         {missingCards.length > 0 ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
             <p className="font-medium text-amber-900 dark:text-amber-200">
