@@ -32,23 +32,28 @@ function PickListPage() {
 
     try {
       const matches = await searchCardsByExactNamesFn({ data: requestedNames })
-      const nextResults = requestedNames.map((requested) => {
-        const match = matches.find((entry) => entry.name.toLowerCase() === requested.toLowerCase())
-        if (!match) {
-          return {
-            requested,
-            status: 'Not found',
-            box: '—',
-            position: '—',
-          }
+      const nextResults = requestedNames.flatMap((requested) => {
+        const cardMatches = matches.filter(
+          (entry) => entry.name.toLowerCase() === requested.toLowerCase(),
+        )
+
+        if (cardMatches.length === 0) {
+          return [
+            {
+              requested,
+              status: 'Not found',
+              box: '—',
+              position: '—',
+            },
+          ]
         }
 
-        return {
+        return cardMatches.map((match) => ({
           requested,
-          status: 'Found',
+          status: `Found (${cardMatches.length})`,
           box: `${match.boxCode} · ${match.boxName}`,
           position: match.position,
-        }
+        }))
       })
 
       setResults(nextResults)
@@ -67,7 +72,7 @@ function PickListPage() {
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Bulk search</h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Paste one exact card name per line to find the first indexed match and its box position.
+          Paste one exact card name per line to find every indexed match and its box position.
         </p>
         <textarea
           value={query}
@@ -108,8 +113,8 @@ function PickListPage() {
                   </td>
                 </tr>
               ) : (
-                results.map((result) => (
-                  <tr key={`${result.requested}-${result.box}-${result.position}`}>
+                results.map((result, index) => (
+                  <tr key={`${result.requested}-${result.box}-${result.position}-${index}`}>
                     <td className="px-4 py-4 text-sm">{result.requested}</td>
                     <td className="px-4 py-4 text-sm">{result.status}</td>
                     <td className="px-4 py-4 text-sm">{result.box}</td>
