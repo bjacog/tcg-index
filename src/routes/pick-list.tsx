@@ -4,15 +4,15 @@ import { searchCardsByExactNamesFn } from '../lib/server/card-actions'
 
 export const Route = createFileRoute('/pick-list')({ component: PickListPage })
 
-type PickListLocation = {
+type PickListBoxGroup = {
   box: string
-  position: string | number
+  positions: Array<string | number>
 }
 
 type PickListGroup = {
   requested: string
   status: string
-  locations: PickListLocation[]
+  boxes: PickListBoxGroup[]
 }
 
 function PickListPage() {
@@ -45,17 +45,28 @@ function PickListPage() {
           return {
             requested,
             status: 'Not found',
-            locations: [],
+            boxes: [],
           }
         }
 
+        const boxesMap = new Map<string, Array<string | number>>()
+
+        for (const match of cardMatches) {
+          const box = `${match.boxCode} · ${match.boxName}`
+          const currentPositions = boxesMap.get(box) ?? []
+          currentPositions.push(match.position)
+          boxesMap.set(box, currentPositions)
+        }
+
+        const boxGroups = Array.from(boxesMap.entries()).map(([box, positions]) => ({
+          box,
+          positions: positions.sort((a, b) => Number(a) - Number(b)),
+        }))
+
         return {
           requested,
-          status: `Found in ${cardMatches.length} location${cardMatches.length === 1 ? '' : 's'}`,
-          locations: cardMatches.map((match) => ({
-            box: `${match.boxCode} · ${match.boxName}`,
-            position: match.position,
-          })),
+          status: `Found in ${cardMatches.length} location${cardMatches.length === 1 ? '' : 's'} across ${boxGroups.length} box${boxGroups.length === 1 ? '' : 'es'}`,
+          boxes: boxGroups,
         }
       })
 
@@ -111,29 +122,21 @@ function PickListPage() {
                   <p className="text-sm text-slate-600 dark:text-slate-300">{result.status}</p>
                 </div>
 
-                {result.locations.length === 0 ? (
+                {result.boxes.length === 0 ? (
                   <div className="px-4 py-4 text-sm text-slate-500 dark:text-slate-400">
                     No indexed copies found.
                   </div>
                 ) : (
-                  <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
-                    <thead className="bg-white dark:bg-slate-900">
-                      <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
-                        <th className="px-4 py-3 font-medium">Box</th>
-                        <th className="px-4 py-3 font-medium">Position</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                      {result.locations.map((location, index) => (
-                        <tr
-                          key={`${result.requested}-${location.box}-${location.position}-${index}`}
-                        >
-                          <td className="px-4 py-4 text-sm">{location.box}</td>
-                          <td className="px-4 py-4 text-sm">{location.position}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  <div className="divide-y divide-slate-200 dark:divide-slate-800">
+                    {result.boxes.map((boxGroup) => (
+                      <div key={`${result.requested}-${boxGroup.box}`} className="px-4 py-4">
+                        <div className="text-sm font-medium">{boxGroup.box}</div>
+                        <div className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                          Positions: {boxGroup.positions.join(', ')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </section>
             ))
