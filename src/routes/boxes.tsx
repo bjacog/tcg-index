@@ -1,18 +1,27 @@
 import { useState } from 'react'
 import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
-import { createBoxFn, listBoxesFn } from '../lib/server/box-actions'
+import {
+  createBoxFn,
+  getBoxSettingsFn,
+  listBoxesFn,
+  setActiveScanningBoxFn,
+} from '../lib/server/box-actions'
 
 export const Route = createFileRoute('/boxes')({
-  loader: () => listBoxesFn(),
+  loader: async () => {
+    const [boxes, settings] = await Promise.all([listBoxesFn(), getBoxSettingsFn()])
+    return { boxes, settings }
+  },
   component: BoxesPage,
 })
 
 function BoxesPage() {
-  const boxes = Route.useLoaderData()
+  const { boxes, settings } = Route.useLoaderData()
   const router = useRouter()
   const [form, setForm] = useState({ code: '', name: '', description: '', locationNote: '' })
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUpdatingActiveBoxId, setIsUpdatingActiveBoxId] = useState<string | null>(null)
 
   async function handleCreateBox(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -30,6 +39,20 @@ function BoxesPage() {
     }
   }
 
+  async function handleSetActiveBox(boxId: string) {
+    setError(null)
+    setIsUpdatingActiveBoxId(boxId)
+
+    try {
+      await setActiveScanningBoxFn({ data: { boxId } })
+      await router.invalidate()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Failed to update scan target')
+    } finally {
+      setIsUpdatingActiveBoxId(null)
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-3">
@@ -41,6 +64,14 @@ function BoxesPage() {
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             Create, inspect, and maintain the ordered contents of your storage boxes.
           </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <span className="font-medium">Current scan target:</span>{' '}
+          {settings.activeScanningBoxId
+            ? (boxes.find((box) => box.id === settings.activeScanningBoxId)?.code ??
+              settings.activeScanningBoxId)
+            : 'None set'}
         </div>
       </div>
 
@@ -113,6 +144,7 @@ function BoxesPage() {
                 <th className="px-4 py-3 font-medium">Code</th>
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Location</th>
+                <th className="px-4 py-3 font-medium">Scan target</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -120,40 +152,69 @@ function BoxesPage() {
               {boxes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={4}
+                    colSpan={5}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
                     No boxes yet. Create the first one on the left.
                   </td>
                 </tr>
               ) : (
-                boxes.map((box) => (
-                  <tr key={box.id}>
-                    <td className="px-4 py-4 text-sm font-medium">{box.code}</td>
-                    <td className="px-4 py-4 text-sm">{box.name}</td>
-                    <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
-                      {box.locationNote || '—'}
-                    </td>
-                    <td className="px-4 py-4 text-sm">
-                      <div className="flex flex-wrap gap-3">
-                        <Link
-                          to="/boxes/$boxId"
-                          params={{ boxId: box.id }}
-                          className="text-emerald-700 dark:text-emerald-400"
-                        >
-                          Open
-                        </Link>
-                        <Link
-                          to="/boxes/$boxId/scan"
-                          params={{ boxId: box.id }}
-                          className="text-slate-600 dark:text-slate-300"
-                        >
-                          Scan
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                boxes.map((box) => {
+                  const isActiveScanTarget = settings.activeScanningBoxId === box.id
+
+                  return (
+                    <tr key={box.id}>
+                      <td className="px-4 py-4 text-sm font-medium">{box.code}</td>
+                      <td className="px-4 py-4 text-sm">{box.name}</td>
+                      <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
+                        {box.locationNote || '—'}
+                      </td>
+                      <td className="px-4 py-4 text-sm">
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                              isActiveScanTarget
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            }`}
+                          >
+                            {isActiveScanTarget ? 'Active' : 'Inactive'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleSetActiveBox(box.id)}
+                            disabled={isActiveScanTarget || isUpdatingActiveBoxId === box.id}
+                            className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                          >
+                            {isUpdatingActiveBoxId === box.id
+                              ? 'Setting…'
+                              : isActiveScanTarget
+                                ? 'Current target'
+                                : 'Set active'}
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm">
+                        <div className="flex flex-wrap gap-3">
+                          <Link
+                            to="/boxes/$boxId"
+                            params={{ boxId: box.id }}
+                            className="text-emerald-700 dark:text-emerald-400"
+                          >
+                            Open
+                          </Link>
+                          <Link
+                            to="/boxes/$boxId/scan"
+                            params={{ boxId: box.id }}
+                            className="text-slate-600 dark:text-slate-300"
+                          >
+                            Scan
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })
               )}
             </tbody>
           </table>
