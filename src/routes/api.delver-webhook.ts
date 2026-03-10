@@ -3,7 +3,7 @@ import { json } from '@tanstack/react-start'
 import type { DelverWebhookEvent } from '../lib/cards'
 import { CardError } from '../lib/cards'
 import { appendScannedCardsToActiveBox } from '../lib/server/card-repository'
-import { ensureStore, saveStore } from '../lib/server/store'
+import { getBoxSettings, setSetting } from '../lib/server/store'
 
 function withCors(response: Response) {
   response.headers.set('Access-Control-Allow-Origin', '*')
@@ -19,23 +19,21 @@ export const Route = createFileRoute('/api/delver-webhook')({
         return withCors(json({ message: 'CORS preflight' }))
       },
       GET: async () => {
-        const store = await ensureStore()
+        const settings = getBoxSettings()
         return withCors(
           json({
             ok: true,
-            activeScanningBoxId: store.settings.activeScanningBoxId,
-            lastWebhookEventAt: store.settings.lastWebhookEventAt,
-            lastWebhookEventType: store.settings.lastWebhookEventType,
+            activeScanningBoxId: settings.activeScanningBoxId,
+            lastWebhookEventAt: settings.lastWebhookEventAt,
+            lastWebhookEventType: settings.lastWebhookEventType,
           }),
         )
       },
       POST: async ({ request }) => {
         const payload = (await request.json()) as DelverWebhookEvent
-        const store = await ensureStore()
         const now = new Date().toISOString()
-        store.settings.lastWebhookEventAt = now
-        store.settings.lastWebhookEventType = payload?.type ?? 'unknown'
-        await saveStore(store)
+        setSetting('lastWebhookEventAt', now)
+        setSetting('lastWebhookEventType', payload?.type ?? 'unknown')
 
         if (payload?.type === 'card_scanned') {
           try {

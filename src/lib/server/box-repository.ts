@@ -1,43 +1,68 @@
 import { randomUUID } from 'node:crypto'
 import {
   BoxError,
+  type BoxRecord,
   type BoxSettings,
   type CreateBoxInput,
   type SetActiveScanningBoxInput,
   type UpdateBoxInput,
   normalizeBoxInput,
 } from '../boxes'
-import { ensureStore, saveStore } from './store'
+import {
+  getBoxSettings as getBoxSettingsFromStore,
+  getDb,
+  runInTransaction,
+  setSetting,
+} from './store'
+
+function mapBoxRow(row: Record<string, unknown>): BoxRecord {
+  return {
+    id: String(row.id),
+    code: String(row.code),
+    name: String(row.name),
+    description: String(row.description ?? ''),
+    locationNote: String(row.location_note ?? ''),
+    createdAt: String(row.created_at),
+    updatedAt: String(row.updated_at),
+  }
+}
 
 export async function listBoxes() {
-  const store = await ensureStore()
-  return [...store.boxes].sort((a, b) => a.code.localeCompare(b.code))
+  const db = getDb()
+  const rows = db.prepare('SELECT * FROM boxes ORDER BY code ASC').all() as Array<
+    Record<string, unknown>
+  >
+
+  return rows.map(mapBoxRow)
 }
 
 export async function getBoxById(id: string) {
-  const store = await ensureStore()
-  return store.boxes.find((box) => box.id === id) ?? null
+  const db = getDb()
+  const row = db.prepare('SELECT * FROM boxes WHERE id = ?').get(id) as
+    | Record<string, unknown>
+    | undefined
+
+  return row ? mapBoxRow(row) : null
 }
 
 export async function getBoxSettings(): Promise<BoxSettings> {
-  const store = await ensureStore()
-  return store.settings
+  return getBoxSettingsFromStore()
 }
 
 export async function createBox(input: CreateBoxInput) {
-  const store = await ensureStore()
+  const db = getDb()
   const normalized = normalizeBoxInput(input)
 
-  const duplicate = store.boxes.find(
-    (box) => box.code.toLowerCase() === normalized.code.toLowerCase(),
-  )
+  const duplicate = db
+    .prepare('SELECT id FROM boxes WHERE lower(code) = lower(?)')
+    .get(normalized.code) as { id: string } | undefined
 
   if (duplicate) {
     throw new BoxError('BOX_CODE_CONFLICT', `Box code ${normalized.code} already exists`)
   }
 
   const timestamp = new Date().toISOString()
-  const box = {
+  const box: BoxRecord = {
     id: randomUUID(),
     code: normalized.code,
     name: normalized.name,
@@ -47,26 +72,32 @@ export async function createBox(input: CreateBoxInput) {
     updatedAt: timestamp,
   }
 
-  store.boxes.push(box)
-  await saveStore(store)
+  db.prepare(
+    `INSERT INTO boxes (id, code, name, description, location_note, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+  ).run(box.id, box.code, box.name, box.description, box.locationNote, box.createdAt, box.updatedAt)
 
   return box
 }
 
 export async function updateBox(input: UpdateBoxInput) {
-  const store = await ensureStore()
-  const box = store.boxes.find((entry) => entry.id === input.id)
+  const db = getDb()
+  const current = db.prepare('SELECT * FROM boxes WHERE id = ?').get(input.id) as
+    | Record<string, unknown>
+    | undefined
 
-  if (!box) {
+  if (!current) {
     throw new BoxError('BOX_NOT_FOUND', 'Box not found')
   }
 
-  const nextCode = input.code === undefined ? box.code : input.code.trim()
-  const nextName = input.name === undefined ? box.name : input.name.trim()
+  const nextCode = input.code === undefined ? String(current.code) : input.code.trim()
+  const nextName = input.name === undefined ? String(current.name) : input.name.trim()
   const nextDescription =
-    input.description === undefined ? box.description : input.description.trim()
+    input.description === undefined ? String(current.description ?? '') : input.description.trim()
   const nextLocationNote =
-    input.locationNote === undefined ? box.locationNote : input.locationNote.trim()
+    input.locationNote === undefined
+      ? String(current.location_note ?? '')
+      : input.locationNote.trim()
 
   if (!nextCode) {
     throw new BoxError('VALIDATION_ERROR', 'Box code is required')
@@ -76,56 +107,58 @@ export async function updateBox(input: UpdateBoxInput) {
     throw new BoxError('VALIDATION_ERROR', 'Box name is required')
   }
 
-  const duplicate = store.boxes.find(
-    (entry) => entry.id !== input.id && entry.code.toLowerCase() === nextCode.toLowerCase(),
-  )
+  const duplicate = db
+    .prepare('SELECT id FROM boxes WHERE id != ? AND lower(code) = lower(?)')
+    .get(input.id, nextCode) as { id: string } | undefined
 
   if (duplicate) {
     throw new BoxError('BOX_CODE_CONFLICT', `Box code ${nextCode} already exists`)
   }
 
-  box.code = nextCode
-  box.name = nextName
-  box.description = nextDescription
-  box.locationNote = nextLocationNote
-  box.updatedAt = new Date().toISOString()
+  const updatedAt = new Date().toISOString()
+  db.prepare(
+    `UPDATE boxes
+     SET code = ?, name = ?, description = ?, location_note = ?, updated_at = ?
+     WHERE id = ?`,
+  ).run(nextCode, nextName, nextDescription, nextLocationNote, updatedAt, input.id)
 
-  await saveStore(store)
-
-  return box
+  return {
+    id: input.id,
+    code: nextCode,
+    name: nextName,
+    description: nextDescription,
+    locationNote: nextLocationNote,
+    createdAt: String(current.created_at),
+    updatedAt,
+  }
 }
 
 export async function setActiveScanningBox(input: SetActiveScanningBoxInput) {
-  const store = await ensureStore()
-
   if (input.boxId !== null) {
-    const box = store.boxes.find((entry) => entry.id === input.boxId)
+    const box = await getBoxById(input.boxId)
     if (!box) {
       throw new BoxError('BOX_NOT_FOUND', 'Box not found')
     }
   }
 
-  store.settings.activeScanningBoxId = input.boxId
-  await saveStore(store)
-
-  return store.settings
+  setSetting('activeScanningBoxId', input.boxId)
+  return getBoxSettingsFromStore()
 }
 
 export async function deleteBox(id: string) {
-  const store = await ensureStore()
-  const index = store.boxes.findIndex((box) => box.id === id)
+  const box = await getBoxById(id)
 
-  if (index === -1) {
+  if (!box) {
     throw new BoxError('BOX_NOT_FOUND', 'Box not found')
   }
 
-  const [removed] = store.boxes.splice(index, 1)
-  store.cards = store.cards.filter((card) => card.boxId !== id)
+  runInTransaction((db) => {
+    db.prepare('DELETE FROM boxes WHERE id = ?').run(id)
 
-  if (store.settings.activeScanningBoxId === id) {
-    store.settings.activeScanningBoxId = null
-  }
+    if (getBoxSettingsFromStore().activeScanningBoxId === id) {
+      setSetting('activeScanningBoxId', null)
+    }
+  })
 
-  await saveStore(store)
-  return removed
+  return box
 }
