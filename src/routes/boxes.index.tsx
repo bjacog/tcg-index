@@ -174,7 +174,7 @@ function BoxesPage() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">Manage boxes</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Create, inspect, and maintain the ordered contents of your storage boxes.
+            Create, inspect, and maintain ordered storage boxes, plus temporary project boxes for picked cards.
           </p>
         </div>
 
@@ -312,6 +312,7 @@ function BoxesPage() {
               <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
                 <th className="px-4 py-3 font-medium">Code</th>
                 <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Location</th>
                 <th className="px-4 py-3 font-medium">Scan target</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
@@ -321,7 +322,7 @@ function BoxesPage() {
               {boxes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
                     No boxes yet. Create the first one on the left.
@@ -330,33 +331,46 @@ function BoxesPage() {
               ) : (
                 boxes.map((box) => {
                   const isActiveScanTarget = settings.activeScanningBoxId === box.id
+                  const isProjectBox = box.kind === 'project'
+
                   return (
                     <tr key={box.id}>
                       <td className="px-4 py-4 text-sm font-medium">{box.code}</td>
                       <td className="px-4 py-4 text-sm">{box.name}</td>
+                      <td className="px-4 py-4 text-sm">
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isProjectBox ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+                        >
+                          {isProjectBox ? 'Project' : 'Storage'}
+                        </span>
+                      </td>
                       <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
                         {box.locationNote || '—'}
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        <div className="flex items-center gap-3">
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanTarget ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
-                          >
-                            {isActiveScanTarget ? 'Active' : 'Inactive'}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleSetActiveBox(box.id)}
-                            disabled={isUpdatingActiveBoxId === box.id}
-                            className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
-                          >
-                            {isUpdatingActiveBoxId === box.id
-                              ? 'Starting…'
-                              : isActiveScanTarget
-                                ? 'Restart here'
-                                : 'Scan into this box'}
-                          </button>
-                        </div>
+                        {isProjectBox ? (
+                          <span className="text-slate-500 dark:text-slate-400">Not available</span>
+                        ) : (
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanTarget ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+                            >
+                              {isActiveScanTarget ? 'Active' : 'Inactive'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleSetActiveBox(box.id)}
+                              disabled={isUpdatingActiveBoxId === box.id}
+                              className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                            >
+                              {isUpdatingActiveBoxId === box.id
+                                ? 'Starting…'
+                                : isActiveScanTarget
+                                  ? 'Restart here'
+                                  : 'Scan into this box'}
+                            </button>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-4 text-sm">
                         <div className="flex flex-wrap gap-3">
@@ -367,13 +381,15 @@ function BoxesPage() {
                           >
                             Open
                           </Link>
-                          <Link
-                            to="/boxes/$boxId/scan"
-                            params={{ boxId: box.id }}
-                            className="text-slate-600 dark:text-slate-300"
-                          >
-                            Scan
-                          </Link>
+                          {!isProjectBox ? (
+                            <Link
+                              to="/boxes/$boxId/scan"
+                              params={{ boxId: box.id }}
+                              className="text-slate-600 dark:text-slate-300"
+                            >
+                              Scan
+                            </Link>
+                          ) : null}
                         </div>
                       </td>
                     </tr>

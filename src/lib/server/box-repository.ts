@@ -21,12 +21,14 @@ function mapBoxRow(row: Record<string, unknown>): BoxRecord {
     locationNote: String(row.location_note ?? ''),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+    kind: String(row.kind ?? 'storage') === 'project' ? 'project' : 'storage',
+    projectNumber: row.project_number === null ? null : Number(row.project_number ?? null),
   }
 }
 
 export async function listBoxes() {
   const db = getDb()
-  const rows = db.prepare('SELECT * FROM boxes ORDER BY code ASC').all() as Array<
+  const rows = db.prepare('SELECT * FROM boxes ORDER BY kind ASC, code ASC').all() as Array<
     Record<string, unknown>
   >
 
@@ -89,12 +91,24 @@ export async function createBox(input: CreateBoxInput) {
     locationNote: normalized.locationNote,
     createdAt: timestamp,
     updatedAt: timestamp,
+    kind: 'storage',
+    projectNumber: null,
   }
 
   db.prepare(
-    `INSERT INTO boxes (id, code, name, description, location_note, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-  ).run(box.id, box.code, box.name, box.description, box.locationNote, box.createdAt, box.updatedAt)
+    `INSERT INTO boxes (id, code, name, description, location_note, kind, project_number, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(
+    box.id,
+    box.code,
+    box.name,
+    box.description,
+    box.locationNote,
+    box.kind,
+    box.projectNumber,
+    box.createdAt,
+    box.updatedAt,
+  )
 
   return box
 }
@@ -107,6 +121,13 @@ export async function updateBox(input: UpdateBoxInput) {
 
   if (!current) {
     throw new BoxError('BOX_NOT_FOUND', 'Box not found')
+  }
+
+  if (String(current.kind ?? 'storage') === 'project' && input.code !== undefined) {
+    const nextCode = input.code.trim()
+    if (nextCode !== String(current.code)) {
+      throw new BoxError('PROJECT_BOX_LOCKED', 'Project box codes cannot be changed')
+    }
   }
 
   const nextCode = input.code === undefined ? String(current.code) : input.code.trim()
@@ -149,7 +170,9 @@ export async function updateBox(input: UpdateBoxInput) {
     locationNote: nextLocationNote,
     createdAt: String(current.created_at),
     updatedAt,
-  }
+    kind: String(current.kind ?? 'storage') === 'project' ? 'project' : 'storage',
+    projectNumber: current.project_number === null ? null : Number(current.project_number ?? null),
+  } satisfies BoxRecord
 }
 
 export async function setActiveScanningBox(input: SetActiveScanningBoxInput) {
@@ -157,6 +180,10 @@ export async function setActiveScanningBox(input: SetActiveScanningBoxInput) {
     const box = await getBoxById(input.boxId)
     if (!box) {
       throw new BoxError('BOX_NOT_FOUND', 'Box not found')
+    }
+
+    if (box.kind === 'project') {
+      throw new BoxError('PROJECT_BOX_SCAN_FORBIDDEN', 'Project boxes cannot be scan targets')
     }
   }
 

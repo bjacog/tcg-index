@@ -6,6 +6,8 @@ export type BoxRecord = {
   locationNote: string
   createdAt: string
   updatedAt: string
+  kind: 'storage' | 'project'
+  projectNumber: number | null
 }
 
 export type BoxSettings = {

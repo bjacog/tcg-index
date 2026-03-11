@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute, notFound, useNavigate, useRouter } from '@tanstack/react-router'
-import { listCardsForBoxFn } from '../lib/server/card-actions'
+import { listBoxesFn } from '../lib/server/box-actions'
+import { listCardsForBoxFn, returnCardsFromProjectFn } from '../lib/server/card-actions'
 import {
   deleteBoxFn,
   getBoxByIdFn,
@@ -12,13 +13,14 @@ import {
 export const Route = createFileRoute('/boxes/$boxId')({
   loader: async ({ params }) => {
     try {
-      const [box, cards, settings] = await Promise.all([
+      const [box, cards, settings, boxes] = await Promise.all([
         getBoxByIdFn({ data: params.boxId }),
         listCardsForBoxFn({ data: params.boxId }),
         getBoxSettingsFn(),
+        listBoxesFn(),
       ])
 
-      return { box, cards, settings }
+      return { box, cards, settings, boxes }
     } catch {
       throw notFound()
     }
@@ -35,7 +37,7 @@ function scryfallImageUrl(scryfallId: string) {
 }
 
 function BoxDetailPage() {
-  const { box, cards, settings } = Route.useLoaderData()
+  const { box, boxes, cards, settings } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [form, setForm] = useState({
@@ -48,8 +50,13 @@ function BoxDetailPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isTogglingActive, setIsTogglingActive] = useState(false)
+  const [selectedReturnCardIds, setSelectedReturnCardIds] = useState<string[]>(cards.map((card) => card.id))
+  const [returnDestinationBoxId, setReturnDestinationBoxId] = useState('')
+  const [isReturningCards, setIsReturningCards] = useState(false)
 
+  const isProjectBox = box.kind === 'project'
   const isActiveScanningBox = settings.activeScanningBoxId === box.id
+  const storageBoxes = useMemo(() => boxes.filter((candidate) => candidate.kind === 'storage'), [boxes])
   const webhookUrl = useMemo(() => {
     if (typeof window === 'undefined') return '/api/delver-webhook'
     return `${window.location.origin}/api/delver-webhook`
@@ -110,6 +117,38 @@ function BoxDetailPage() {
     }
   }
 
+  function toggleReturnCard(cardId: string, checked: boolean) {
+    setSelectedReturnCardIds((current) => {
+      if (checked) {
+        return current.includes(cardId) ? current : [...current, cardId]
+      }
+
+      return current.filter((id) => id !== cardId)
+    })
+  }
+
+  async function handleReturnCards() {
+    setError(null)
+    setIsReturningCards(true)
+
+    try {
+      const result = await returnCardsFromProjectFn({
+        data: {
+          sourceBoxId: box.id,
+          destinationBoxId: returnDestinationBoxId,
+          cardIds: selectedReturnCardIds,
+        },
+      })
+
+      await router.invalidate()
+      await navigate({ to: '/boxes/$boxId', params: { boxId: result.destinationBoxId } })
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Failed to return cards')
+    } finally {
+      setIsReturningCards(false)
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -117,131 +156,183 @@ function BoxDetailPage() {
           <Link to="/boxes" className="text-sm text-emerald-700 dark:text-emerald-400">
             ← Back to boxes
           </Link>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">{box.code}</h1>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Ordered contents for this box. Hover a card name to preview its image when a Scryfall ID
-            is available.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button
-            type="button"
-            onClick={handleToggleActiveScanning}
-            disabled={isTogglingActive}
-            className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
-          >
-            {isTogglingActive
-              ? 'Updating…'
-              : isActiveScanningBox
-                ? 'Unset active scanner box'
-                : 'Set as active scanner box'}
-          </button>
-          <Link
-            to="/boxes/$boxId/scan"
-            params={{ boxId: box.id }}
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white"
-          >
-            Scan cards
-          </Link>
-        </div>
-      </div>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold">Delver webhook</h2>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Point Delver at this endpoint. New scanned cards will append to this box only while it
-              is active.
-            </p>
-          </div>
-          <span
-            className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanningBox ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
-          >
-            {isActiveScanningBox ? 'Active for scanning' : 'Inactive'}
-          </span>
-        </div>
-        <div className="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
-          <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
-            Webhook endpoint
-          </p>
-          <code className="mt-2 block break-all text-sm">{webhookUrl}</code>
-          <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-            Supports POST + OPTIONS for Delver and a simple GET status check in the browser.
-          </p>
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-        <form
-          onSubmit={handleSave}
-          className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-        >
-          <h2 className="text-lg font-semibold">Box settings</h2>
-          <div className="mt-4 space-y-4">
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium">Code</span>
-              <input
-                value={form.code}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, code: event.target.value }))
-                }
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium">Name</span>
-              <input
-                value={form.name}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, name: event.target.value }))
-                }
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium">Description</span>
-              <textarea
-                value={form.description}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, description: event.target.value }))
-                }
-                className="min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-            <label className="block text-sm">
-              <span className="mb-1 block font-medium">Location note</span>
-              <input
-                value={form.locationNote}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, locationNote: event.target.value }))
-                }
-                className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
-              />
-            </label>
-          </div>
-
-          {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
-
-          <div className="mt-4 flex flex-wrap gap-3">
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight">{box.code}</h1>
+            <span
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isProjectBox ? 'bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
             >
-              {isSaving ? 'Saving…' : 'Save changes'}
-            </button>
+              {isProjectBox ? 'Project box' : 'Storage box'}
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            {isProjectBox
+              ? 'Temporary working box for cards you picked out of storage. Return selected cards to a storage box when you are done.'
+              : 'Ordered contents for this box. Hover a card name to preview its image when a Scryfall ID is available.'}
+          </p>
+        </div>
+
+        {!isProjectBox ? (
+          <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
+              onClick={handleToggleActiveScanning}
+              disabled={isTogglingActive}
+              className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
             >
-              {isDeleting ? 'Deleting…' : 'Delete box'}
+              {isTogglingActive
+                ? 'Updating…'
+                : isActiveScanningBox
+                  ? 'Unset active scanner box'
+                  : 'Set as active scanner box'}
             </button>
+            <Link
+              to="/boxes/$boxId/scan"
+              params={{ boxId: box.id }}
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white"
+            >
+              Scan cards
+            </Link>
           </div>
-        </form>
+        ) : null}
+      </div>
+
+      {!isProjectBox ? (
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Delver webhook</h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Point Delver at this endpoint. New scanned cards will append to this box only while it
+                is active.
+              </p>
+            </div>
+            <span
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanningBox ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+            >
+              {isActiveScanningBox ? 'Active for scanning' : 'Inactive'}
+            </span>
+          </div>
+          <div className="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
+            <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+              Webhook endpoint
+            </p>
+            <code className="mt-2 block break-all text-sm">{webhookUrl}</code>
+            <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+              Supports POST + OPTIONS for Delver and a simple GET status check in the browser.
+            </p>
+          </div>
+        </section>
+      ) : null}
+
+      <section className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <form
+            onSubmit={handleSave}
+            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+          >
+            <h2 className="text-lg font-semibold">{isProjectBox ? 'Project box details' : 'Box settings'}</h2>
+            <div className="mt-4 space-y-4">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Code</span>
+                <input
+                  value={form.code}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, code: event.target.value }))
+                  }
+                  disabled={isProjectBox}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Name</span>
+                <input
+                  value={form.name}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, name: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Description</span>
+                <textarea
+                  value={form.description}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, description: event.target.value }))
+                  }
+                  className="min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Location note</span>
+                <input
+                  value={form.locationNote}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, locationNote: event.target.value }))
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+            </div>
+
+            {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
+
+            <div className="mt-4 flex flex-wrap gap-3">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSaving ? 'Saving…' : 'Save changes'}
+              </button>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
+              >
+                {isDeleting ? 'Deleting…' : 'Delete box'}
+              </button>
+            </div>
+          </form>
+
+          {isProjectBox ? (
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <h2 className="text-lg font-semibold">Return selected cards</h2>
+              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                Send the checked cards back into a normal storage box. They will be appended to the
+                end of that box in the order you selected here.
+              </p>
+              <label className="mt-4 block text-sm">
+                <span className="mb-1 block font-medium">Destination storage box</span>
+                <select
+                  value={returnDestinationBoxId}
+                  onChange={(event) => setReturnDestinationBoxId(event.target.value)}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
+                >
+                  <option value="">Choose a storage box…</option>
+                  {storageBoxes.map((storageBox) => (
+                    <option key={storageBox.id} value={storageBox.id}>
+                      {storageBox.code} · {storageBox.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={handleReturnCards}
+                disabled={
+                  isReturningCards || !returnDestinationBoxId || selectedReturnCardIds.length === 0
+                }
+                className="mt-4 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isReturningCards
+                  ? 'Returning…'
+                  : `Return ${selectedReturnCardIds.length} selected card${selectedReturnCardIds.length === 1 ? '' : 's'}`}
+              </button>
+            </section>
+          ) : null}
+        </div>
 
         <section className="overflow-visible rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
@@ -254,6 +345,7 @@ function BoxDetailPage() {
           <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
             <thead className="bg-slate-50 dark:bg-slate-950/60">
               <tr className="text-left text-sm text-slate-500 dark:text-slate-400">
+                {isProjectBox ? <th className="px-4 py-3 font-medium">Return</th> : null}
                 <th className="px-4 py-3 font-medium">Position</th>
                 <th className="px-4 py-3 font-medium">Card</th>
                 <th className="px-4 py-3 font-medium">Set</th>
@@ -265,7 +357,7 @@ function BoxDetailPage() {
               {cards.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={isProjectBox ? 6 : 5}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
                     No cards in this box yet.
@@ -274,9 +366,20 @@ function BoxDetailPage() {
               ) : (
                 cards.map((card) => {
                   const imageUrl = scryfallImageUrl(card.scryfallId)
+                  const checked = selectedReturnCardIds.includes(card.id)
 
                   return (
                     <tr key={card.id}>
+                      {isProjectBox ? (
+                        <td className="px-4 py-4 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(event) => toggleReturnCard(card.id, event.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                          />
+                        </td>
+                      ) : null}
                       <td className="px-4 py-4 text-sm font-medium">{card.position}</td>
                       <td className="px-4 py-4 text-sm">
                         <div className="group relative inline-flex items-center">

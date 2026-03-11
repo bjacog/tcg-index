@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
+import type { PickListBoxGroup } from '../lib/pick-lists'
 import { searchCardsByExactNamesFn } from '../lib/server/card-actions'
 import { createPickListHistoryFn } from '../lib/server/pick-list-actions'
 
@@ -9,16 +10,6 @@ export const Route = createFileRoute('/pick-list')({
   }),
   component: PickListPage,
 })
-
-type PickListCardEntry = {
-  name: string
-  position: number
-}
-
-type PickListBoxGroup = {
-  box: string
-  cards: PickListCardEntry[]
-}
 
 function PickListPage() {
   const search = Route.useSearch()
@@ -57,22 +48,40 @@ function PickListPage() {
         return !foundNames.has(lowered)
       })
 
-      const boxesMap = new Map<string, PickListCardEntry[]>()
+      const boxesMap = new Map<
+        string,
+        {
+          boxId: string
+          boxCode: string
+          boxName: string
+          box: string
+          cards: PickListBoxGroup['cards']
+        }
+      >()
 
       for (const match of matches) {
         const box = `${match.boxCode} · ${match.boxName}`
-        const existingBoxGroup = boxesMap.get(box) ?? []
-        existingBoxGroup.push({
+        const existingBoxGroup = boxesMap.get(match.boxId) ?? {
+          boxId: match.boxId,
+          boxCode: match.boxCode,
+          boxName: match.boxName,
+          box,
+          cards: [],
+        }
+
+        existingBoxGroup.cards.push({
+          cardId: match.id,
+          boxId: match.boxId,
           name: match.name,
           position: Number(match.position),
         })
-        boxesMap.set(box, existingBoxGroup)
+        boxesMap.set(match.boxId, existingBoxGroup)
       }
 
-      const nextResults = Array.from(boxesMap.entries())
-        .map(([box, cards]) => ({
-          box,
-          cards: cards.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
+      const nextResults = Array.from(boxesMap.values())
+        .map((boxGroup) => ({
+          ...boxGroup,
+          cards: boxGroup.cards.sort((a, b) => a.position - b.position || a.name.localeCompare(b.name)),
         }))
         .sort((a, b) => a.box.localeCompare(b.box))
 
@@ -109,8 +118,8 @@ function PickListPage() {
           </Link>
         </div>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-          Paste one exact card name per line to group the requested cards by the boxes that contain
-          them.
+          Paste one exact card name per line to group the requested cards by the storage boxes that
+          contain them.
         </p>
         <textarea
           value={query}
@@ -145,7 +154,7 @@ function PickListPage() {
         {missingCards.length > 0 ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/40">
             <p className="font-medium text-amber-900 dark:text-amber-200">
-              Cards not found in any box
+              Cards not found in any storage box
             </p>
             <p className="mt-1 text-amber-800 dark:text-amber-300">{missingCards.join(', ')}</p>
           </div>
@@ -168,7 +177,7 @@ function PickListPage() {
           ) : (
             results.map((result) => (
               <section
-                key={result.box}
+                key={result.boxId}
                 className="overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800"
               >
                 <div className="bg-slate-50 px-4 py-4 dark:bg-slate-950/60">
@@ -181,10 +190,7 @@ function PickListPage() {
 
                 <div className="divide-y divide-slate-200 dark:divide-slate-800">
                   {result.cards.map((card) => (
-                    <div
-                      key={`${result.box}-${card.name}-${card.position}`}
-                      className="flex items-center gap-4 px-4 py-4"
-                    >
+                    <div key={card.cardId} className="flex items-center gap-4 px-4 py-4">
                       <div className="min-w-20 text-2xl font-semibold tracking-tight text-emerald-700 dark:text-emerald-400">
                         #{card.position}
                       </div>

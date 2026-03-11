@@ -20,6 +20,8 @@ type LegacyStore = {
     locationNote: string
     createdAt: string
     updatedAt: string
+    kind?: 'storage' | 'project'
+    projectNumber?: number | null
   }>
   cards?: CardRecord[]
   settings?: Partial<BoxSettings>
@@ -50,6 +52,8 @@ function getDatabase() {
       name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       location_note TEXT NOT NULL DEFAULT '',
+      kind TEXT NOT NULL DEFAULT 'storage',
+      project_number INTEGER,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -96,10 +100,32 @@ function getDatabase() {
     CREATE INDEX IF NOT EXISTS idx_pick_lists_created_at ON pick_lists(created_at DESC);
   `)
 
+  migrateDatabase(database)
   seedDefaultSettings(database)
   migrateLegacyJsonStore(database)
 
   return database
+}
+
+function migrateDatabase(db: DatabaseSync) {
+  const boxColumns = db.prepare('PRAGMA table_info(boxes)').all() as Array<{ name: string }>
+  const boxColumnNames = new Set(boxColumns.map((column) => String(column.name)))
+
+  if (!boxColumnNames.has('kind')) {
+    db.exec(`ALTER TABLE boxes ADD COLUMN kind TEXT NOT NULL DEFAULT 'storage'`)
+  }
+
+  if (!boxColumnNames.has('project_number')) {
+    db.exec('ALTER TABLE boxes ADD COLUMN project_number INTEGER')
+  }
+
+  db.exec(`
+    UPDATE boxes
+    SET kind = 'project'
+    WHERE kind IS NULL OR trim(kind) = ''
+      AND code GLOB 'PROJECT-[0-9]*'
+      AND name GLOB 'Project [0-9]*'
+  `)
 }
 
 function seedDefaultSettings(db: DatabaseSync) {
@@ -125,8 +151,8 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
   const parsed = JSON.parse(raw) as LegacyStore
 
   const insertBox = db.prepare(`
-    INSERT INTO boxes (id, code, name, description, location_note, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO boxes (id, code, name, description, location_note, kind, project_number, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const insertCard = db.prepare(`
@@ -151,6 +177,8 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
         box.name,
         box.description ?? '',
         box.locationNote ?? '',
+        box.kind ?? 'storage',
+        box.projectNumber ?? null,
         box.createdAt,
         box.updatedAt,
       )
