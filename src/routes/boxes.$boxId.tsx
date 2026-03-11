@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { listBoxesFn } from '../lib/server/box-actions'
 import { listCardsForBoxFn, returnCardsFromProjectFn } from '../lib/server/card-actions'
@@ -57,10 +57,26 @@ function BoxDetailPage() {
   const isProjectBox = box.kind === 'project'
   const isActiveScanningBox = settings.activeScanningBoxId === box.id
   const storageBoxes = useMemo(() => boxes.filter((candidate) => candidate.kind === 'storage'), [boxes])
+  const allProjectCardIds = useMemo(() => cards.map((card) => card.id), [cards])
+  const areAllProjectCardsSelected =
+    cards.length > 0 && selectedReturnCardIds.length === cards.length && cards.every((card) => selectedReturnCardIds.includes(card.id))
   const webhookUrl = useMemo(() => {
     if (typeof window === 'undefined') return '/api/delver-webhook'
     return `${window.location.origin}/api/delver-webhook`
   }, [])
+
+  useEffect(() => {
+    setForm({
+      code: box.code,
+      name: box.name,
+      description: box.description,
+      locationNote: box.locationNote,
+    })
+  }, [box.code, box.description, box.locationNote, box.name])
+
+  useEffect(() => {
+    setSelectedReturnCardIds(cards.map((card) => card.id))
+  }, [cards])
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -127,7 +143,7 @@ function BoxDetailPage() {
     })
   }
 
-  async function handleReturnCards() {
+  async function handleReturnCards(cardIds = selectedReturnCardIds) {
     setError(null)
     setIsReturningCards(true)
 
@@ -136,12 +152,18 @@ function BoxDetailPage() {
         data: {
           sourceBoxId: box.id,
           destinationBoxId: returnDestinationBoxId,
-          cardIds: selectedReturnCardIds,
+          cardIds,
         },
       })
 
       await router.invalidate()
-      await navigate({ to: '/boxes/$boxId', params: { boxId: result.destinationBoxId } })
+
+      if (result.sourceBoxDeleted) {
+        await navigate({ to: '/boxes/$boxId', params: { boxId: result.destinationBoxId } })
+        return
+      }
+
+      await navigate({ to: '/boxes/$boxId', params: { boxId: box.id } })
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Failed to return cards')
     } finally {
@@ -166,7 +188,7 @@ function BoxDetailPage() {
           </div>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             {isProjectBox
-              ? 'Temporary working box for cards you picked out of storage. Return selected cards to a storage box when you are done.'
+              ? 'Temporary working box for cards picked out of storage. Return them to a storage box when you are done; empty project boxes clean themselves up.'
               : 'Ordered contents for this box. Hover a card name to preview its image when a Scryfall ID is available.'}
           </p>
         </div>
@@ -242,6 +264,11 @@ function BoxDetailPage() {
                   disabled={isProjectBox}
                   className="w-full rounded-xl border border-slate-300 px-3 py-2.5 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
                 />
+                {isProjectBox ? (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Project box codes are generated automatically and stay locked.
+                  </p>
+                ) : null}
               </label>
               <label className="block text-sm">
                 <span className="mb-1 block font-medium">Name</span>
@@ -270,8 +297,14 @@ function BoxDetailPage() {
                   onChange={(event) =>
                     setForm((current) => ({ ...current, locationNote: event.target.value }))
                   }
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
+                  disabled={isProjectBox}
+                  className="w-full rounded-xl border border-slate-300 px-3 py-2.5 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-950"
                 />
+                {isProjectBox ? (
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Project boxes do not keep a separate storage location.
+                  </p>
+                ) : null}
               </label>
             </div>
 
@@ -298,11 +331,25 @@ function BoxDetailPage() {
 
           {isProjectBox ? (
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <h2 className="text-lg font-semibold">Return selected cards</h2>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                Send the checked cards back into a normal storage box. They will be appended to the
-                end of that box in the order you selected here.
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold">Return cards</h2>
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+                    Send checked cards back into a normal storage box. They will be appended to the
+                    end of that box in project-box order.
+                  </p>
+                </div>
+                {cards.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedReturnCardIds(areAllProjectCardsSelected ? [] : allProjectCardIds)}
+                    className="text-sm text-violet-700 dark:text-violet-400"
+                  >
+                    {areAllProjectCardsSelected ? 'Clear selection' : 'Select all'}
+                  </button>
+                ) : null}
+              </div>
+
               <label className="mt-4 block text-sm">
                 <span className="mb-1 block font-medium">Destination storage box</span>
                 <select
@@ -318,18 +365,29 @@ function BoxDetailPage() {
                   ))}
                 </select>
               </label>
-              <button
-                type="button"
-                onClick={handleReturnCards}
-                disabled={
-                  isReturningCards || !returnDestinationBoxId || selectedReturnCardIds.length === 0
-                }
-                className="mt-4 w-full rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isReturningCards
-                  ? 'Returning…'
-                  : `Return ${selectedReturnCardIds.length} selected card${selectedReturnCardIds.length === 1 ? '' : 's'}`}
-              </button>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => handleReturnCards()}
+                  disabled={
+                    isReturningCards || !returnDestinationBoxId || selectedReturnCardIds.length === 0
+                  }
+                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isReturningCards
+                    ? 'Returning…'
+                    : `Return ${selectedReturnCardIds.length} selected card${selectedReturnCardIds.length === 1 ? '' : 's'}`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReturnCards(allProjectCardIds)}
+                  disabled={isReturningCards || !returnDestinationBoxId || cards.length === 0}
+                  className="rounded-xl border border-violet-300 px-4 py-3 text-sm font-medium text-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900 dark:text-violet-400"
+                >
+                  Return all and close project box
+                </button>
+              </div>
             </section>
           ) : null}
         </div>

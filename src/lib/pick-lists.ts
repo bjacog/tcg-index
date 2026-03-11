@@ -34,6 +34,14 @@ export type ReturnCardsInput = {
   cardIds: string[]
 }
 
+export type ReturnCardsResult = {
+  sourceBoxId: string
+  sourceBoxDeleted: boolean
+  destinationBoxId: string
+  destinationBoxCode: string
+  movedCardCount: number
+}
+
 export type PickCardsInput = {
   pickListId: string
   cardIds: string[]

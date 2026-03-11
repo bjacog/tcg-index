@@ -8,7 +8,12 @@ import {
   type DelverScannedCard,
 } from '../cards'
 import type { BoxRecord } from '../boxes'
-import type { PickCardsInput, PickExecutionResult, ReturnCardsInput } from '../pick-lists'
+import type {
+  PickCardsInput,
+  PickExecutionResult,
+  ReturnCardsInput,
+  ReturnCardsResult,
+} from '../pick-lists'
 import { getBoxById } from './box-repository'
 import { getPickListById } from './pick-list-repository'
 import { getAppSettings, getDb, runInTransaction, setAppSetting } from './store'
@@ -227,7 +232,7 @@ export async function pickCardsIntoProject(input: PickCardsInput): Promise<PickE
   })
 }
 
-export async function returnCardsFromProject(input: ReturnCardsInput) {
+export async function returnCardsFromProject(input: ReturnCardsInput): Promise<ReturnCardsResult> {
   if (input.cardIds.length === 0) {
     throw new CardError('VALIDATION_ERROR', 'Select at least one card to return')
   }
@@ -278,7 +283,19 @@ export async function returnCardsFromProject(input: ReturnCardsInput) {
 
     reindexBoxPositions(db, sourceBox.id)
 
+    const remainingInSource = db
+      .prepare('SELECT COUNT(*) as count FROM cards WHERE box_id = ?')
+      .get(sourceBox.id) as { count: number }
+
+    const sourceBoxDeleted = Number(remainingInSource.count) === 0
+
+    if (sourceBoxDeleted) {
+      db.prepare('DELETE FROM boxes WHERE id = ?').run(sourceBox.id)
+    }
+
     return {
+      sourceBoxId: sourceBox.id,
+      sourceBoxDeleted,
       destinationBoxId: destinationBox.id,
       destinationBoxCode: destinationBox.code,
       movedCardCount: orderedCards.length,

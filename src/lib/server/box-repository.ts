@@ -123,10 +123,19 @@ export async function updateBox(input: UpdateBoxInput) {
     throw new BoxError('BOX_NOT_FOUND', 'Box not found')
   }
 
-  if (String(current.kind ?? 'storage') === 'project' && input.code !== undefined) {
+  const isProjectBox = String(current.kind ?? 'storage') === 'project'
+
+  if (isProjectBox && input.code !== undefined) {
     const nextCode = input.code.trim()
     if (nextCode !== String(current.code)) {
       throw new BoxError('PROJECT_BOX_LOCKED', 'Project box codes cannot be changed')
+    }
+  }
+
+  if (isProjectBox && input.locationNote !== undefined) {
+    const nextLocationNote = input.locationNote.trim()
+    if (nextLocationNote !== String(current.location_note ?? '')) {
+      throw new BoxError('PROJECT_BOX_LOCATION_LOCKED', 'Project box location cannot be changed')
     }
   }
 
