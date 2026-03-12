@@ -1,5 +1,4 @@
 import { Link } from '@tanstack/react-router'
-import ThemeToggle from './ThemeToggle'
 
 const navItems = [
   { to: '/', label: 'Dashboard' },
@@ -33,10 +32,6 @@ export default function Header() {
               {item.label}
             </Link>
           ))}
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          <ThemeToggle />
         </div>
       </nav>
     </header>
