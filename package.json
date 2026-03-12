@@ -22,7 +22,9 @@
     "cert:generate": "bash ./scripts/generate-local-cert.sh",
     "electron": "electron .",
     "electron:dev": "ELECTRON_RENDERER_URL=http://localhost:3000 electron .",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:linux": "npm run build && electron-builder --linux AppImage deb",
+    "electron:build:win": "npm run build && electron-builder --win nsis"
   },
   "build": {
     "appId": "ai.openclaw.tcg-index",
