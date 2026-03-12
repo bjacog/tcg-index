@@ -16,6 +16,18 @@ const pollIntervalMs = Number(process.env.ELECTRON_POLL_INTERVAL_MS || 1200)
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const clientDistDirectory = path.resolve(currentDirectory, '../dist/client')
 
+function resolvePortableDataDirectory() {
+  if (process.env.TCG_INDEX_DATA_DIR?.trim()) {
+    return process.env.TCG_INDEX_DATA_DIR
+  }
+
+  if (isDev) {
+    return path.resolve(process.cwd(), 'data')
+  }
+
+  return path.resolve(path.dirname(app.getPath('exe')), 'data')
+}
+
 /** @type {BrowserWindow | null} */
 let mainWindow = null
 /** @type {import('node:http').Server | null} */
@@ -267,6 +279,7 @@ ipcMain.handle('runtime:is-electron', () => true)
 ipcMain.handle('runtime:get-server-origin', () => localServerUrl)
 
 app.whenReady().then(async () => {
+  process.env.TCG_INDEX_DATA_DIR = resolvePortableDataDirectory()
   await createMainWindow()
 
   app.on('activate', async () => {

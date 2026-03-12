@@ -1,11 +1,22 @@
 import { existsSync, mkdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import process from 'node:process'
 import { DatabaseSync } from 'node:sqlite'
 import type { BoxSettings } from '../boxes'
 import type { CardRecord } from '../cards'
 import type { PickListHistoryRecord } from '../pick-lists'
 
-const dataDirectory = path.resolve(process.cwd(), 'data')
+function resolveDataDirectory() {
+  const configuredDirectory = process.env.TCG_INDEX_DATA_DIR?.trim()
+
+  if (configuredDirectory) {
+    return path.resolve(configuredDirectory)
+  }
+
+  return path.resolve(process.cwd(), 'data')
+}
+
+const dataDirectory = resolveDataDirectory()
 const databaseFilePath = path.join(dataDirectory, 'tcg-index.sqlite')
 const legacyJsonFilePath = path.join(dataDirectory, 'boxes.json')
 
@@ -340,4 +351,4 @@ export function getDb() {
   return getDatabase()
 }
 
-export { databaseFilePath }
+export { dataDirectory, databaseFilePath }

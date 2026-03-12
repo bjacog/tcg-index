@@ -11,7 +11,7 @@
   },
   "scripts": {
     "dev": "vite dev --port 3000",
-    "dev:https": "vite dev --port 3000 --host",
+    "dev:https": "VITE_DEV_HTTPS=true vite dev --port 3000 --host",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
