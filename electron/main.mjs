@@ -1,10 +1,11 @@
 /* global Headers, Request, fetch, setInterval, clearInterval, console */
 
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
-import { createReadStream, existsSync } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { createReadStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { access, stat } from 'node:fs/promises'
+import { constants as fsConstants } from 'node:fs'
 import { createServer } from 'node:http'
 import path from 'node:path'
 import process from 'node:process'
@@ -15,18 +16,7 @@ const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:3000'
 const pollIntervalMs = Number(process.env.ELECTRON_POLL_INTERVAL_MS || 1200)
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
 const clientDistDirectory = path.resolve(currentDirectory, '../dist/client')
-
-function resolvePortableDataDirectory() {
-  if (process.env.TCG_INDEX_DATA_DIR?.trim()) {
-    return process.env.TCG_INDEX_DATA_DIR
-  }
-
-  if (isDev) {
-    return path.resolve(process.cwd(), 'data')
-  }
-
-  return path.resolve(path.dirname(app.getPath('exe')), 'data')
-}
+const appConfigFileName = 'app-config.json'
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null
@@ -56,6 +46,122 @@ const mimeTypes = new Map([
   ['.woff', 'font/woff'],
   ['.woff2', 'font/woff2'],
 ])
+
+function getAppConfigPath() {
+  return path.join(app.getPath('userData'), appConfigFileName)
+}
+
+function readAppConfig() {
+  const configPath = getAppConfigPath()
+  if (!existsSync(configPath)) {
+    return {}
+  }
+
+  try {
+    const raw = readFileSync(configPath, 'utf8')
+    return JSON.parse(raw)
+  } catch (error) {
+    console.error('Failed to read app config', error)
+    return {}
+  }
+}
+
+function writeAppConfig(config) {
+  const configPath = getAppConfigPath()
+  mkdirSync(path.dirname(configPath), { recursive: true })
+  writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf8')
+}
+
+function resolveInitialSuggestedDataDirectory() {
+  if (isDev) {
+    return path.resolve(process.cwd(), 'data')
+  }
+
+  return path.resolve(path.dirname(app.getPath('exe')), 'data')
+}
+
+async function isUsableDataDirectory(directoryPath) {
+  try {
+    await access(directoryPath, fsConstants.R_OK | fsConstants.W_OK)
+    const directoryStats = await stat(directoryPath)
+    return directoryStats.isDirectory()
+  } catch {
+    return false
+  }
+}
+
+async function promptForDataDirectory(defaultPath) {
+  const result = await dialog.showOpenDialog({
+    title: 'Choose TCG Index data folder',
+    defaultPath,
+    properties: ['openDirectory', 'createDirectory'],
+    buttonLabel: 'Use this folder',
+    message:
+      'Select the folder where TCG Index should store and read tcg-index.sqlite.',
+  })
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return null
+  }
+
+  return result.filePaths[0]
+}
+
+async function resolveDataDirectorySelection() {
+  const configuredDirectory = process.env.TCG_INDEX_DATA_DIR?.trim()
+  if (configuredDirectory) {
+    mkdirSync(configuredDirectory, { recursive: true })
+    return path.resolve(configuredDirectory)
+  }
+
+  const appConfig = readAppConfig()
+  const rememberedDirectory =
+    typeof appConfig.dataDirectory === 'string' && appConfig.dataDirectory.trim()
+      ? path.resolve(appConfig.dataDirectory)
+      : null
+
+  if (rememberedDirectory && (await isUsableDataDirectory(rememberedDirectory))) {
+    return rememberedDirectory
+  }
+
+  const defaultPath = rememberedDirectory || resolveInitialSuggestedDataDirectory()
+
+  while (true) {
+    const selectedDirectory = await promptForDataDirectory(defaultPath)
+
+    if (!selectedDirectory) {
+      const choice = dialog.showMessageBoxSync({
+        type: 'warning',
+        buttons: ['Quit', 'Choose folder again'],
+        defaultId: 1,
+        cancelId: 0,
+        title: 'Data folder required',
+        message: 'TCG Index needs a writable data folder before it can start.',
+      })
+
+      if (choice === 0) {
+        app.quit()
+        return null
+      }
+
+      continue
+    }
+
+    mkdirSync(selectedDirectory, { recursive: true })
+
+    if (await isUsableDataDirectory(selectedDirectory)) {
+      writeAppConfig({ ...appConfig, dataDirectory: path.resolve(selectedDirectory) })
+      return path.resolve(selectedDirectory)
+    }
+
+    dialog.showMessageBoxSync({
+      type: 'error',
+      buttons: ['OK'],
+      title: 'Folder not usable',
+      message: 'The selected folder is not readable and writable. Please choose another folder.',
+    })
+  }
+}
 
 function emitPollingStatus(payload) {
   if (!mainWindow || mainWindow.isDestroyed()) {
@@ -98,7 +204,8 @@ async function tryServeStaticAsset(req, res) {
     return false
   }
 
-  const contentType = mimeTypes.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream'
+  const contentType =
+    mimeTypes.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream'
   res.statusCode = 200
   res.setHeader('content-type', contentType)
   res.setHeader('content-length', fileStats.size)
@@ -279,7 +386,12 @@ ipcMain.handle('runtime:is-electron', () => true)
 ipcMain.handle('runtime:get-server-origin', () => localServerUrl)
 
 app.whenReady().then(async () => {
-  process.env.TCG_INDEX_DATA_DIR = resolvePortableDataDirectory()
+  const selectedDataDirectory = await resolveDataDirectorySelection()
+  if (!selectedDataDirectory) {
+    return
+  }
+
+  process.env.TCG_INDEX_DATA_DIR = selectedDataDirectory
   await createMainWindow()
 
   app.on('activate', async () => {
