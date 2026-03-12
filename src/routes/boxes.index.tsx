@@ -74,6 +74,37 @@ function BoxesPage() {
       return
     }
 
+    if (window.tcgIndexDesktop?.isElectron) {
+      return window.tcgIndexDesktop.onPollingStatus(async (result) => {
+        if (!result.ok) {
+          setPollStatus(result.message ?? 'Polling failed')
+          return
+        }
+
+        const scannedResults = (result.boxResults ?? []).filter(
+          (entry) => entry.type === 'card_scanned',
+        )
+
+        if (scannedResults.length > 0) {
+          const summary = scannedResults
+            .map(
+              (entry) =>
+                `${entry.boxCode}: ${entry.ingested ?? 0} card${entry.ingested === 1 ? '' : 's'}`,
+            )
+            .join(' · ')
+          setPollStatus(`Received scans — ${summary}`)
+          await router.invalidate()
+        } else if (result.empty) {
+          setPollStatus(
+            `Waiting for scans on ${activeScanningBoxes.length} active box${activeScanningBoxes.length === 1 ? '' : 'es'}…`,
+          )
+        } else {
+          setPollStatus('Received scanner event')
+          await router.invalidate()
+        }
+      })
+    }
+
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 

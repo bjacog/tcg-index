@@ -1,8 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { CardError } from '../lib/cards'
-import type { DelverWebhookEvent } from '../lib/cards'
-import { processDelverEvent } from '../lib/server/delver'
+import { getActivePollingBoxes } from '../lib/server/box-repository'
 import { getAppSettings } from '../lib/server/store'
 
 function withCors(response: Response) {
@@ -20,30 +18,32 @@ export const Route = createFileRoute('/api/delver-webhook')({
       },
       GET: async () => {
         const settings = getAppSettings()
+        const activeBoxes = await getActivePollingBoxes()
+
         return withCors(
           json({
             ok: true,
-            activeScanningBoxId: settings.activeScanningBoxId,
+            activePollingBoxes: activeBoxes.map((box) => ({ id: box.id, code: box.code })),
             lastWebhookEventAt: settings.lastWebhookEventAt,
             lastWebhookEventType: settings.lastWebhookEventType,
             delverPollingEndpoint: settings.delverPollingEndpoint,
             delverPollingEnabled: settings.delverPollingEnabled,
+            message:
+              'Webhook POST handling is not used in the Electron packaging path; Electron polls configured Delver endpoints directly.',
           }),
         )
       },
-      POST: async ({ request }) => {
-        const payload = (await request.json()) as DelverWebhookEvent
-
-        try {
-          return withCors(json(await processDelverEvent(payload)))
-        } catch (error) {
-          if (error instanceof CardError) {
-            return withCors(
-              json({ ok: false, error: error.code, message: error.message }, { status: 409 }),
-            )
-          }
-          throw error
-        }
+      POST: async () => {
+        return withCors(
+          json(
+            {
+              ok: false,
+              message:
+                'Direct webhook ingestion is currently disabled. Use configured Delver polling endpoints instead.',
+            },
+            { status: 501 },
+          ),
+        )
       },
     },
   },
