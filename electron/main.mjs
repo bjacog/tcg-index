@@ -3,13 +3,18 @@
 import { app, BrowserWindow, ipcMain } from 'electron'
 import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
+import { createReadStream, existsSync } from 'node:fs'
+import { stat } from 'node:fs/promises'
 import { createServer } from 'node:http'
+import path from 'node:path'
 import process from 'node:process'
-import { URL } from 'node:url'
+import { URL, fileURLToPath } from 'node:url'
 
 const isDev = !app.isPackaged
-const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://127.0.0.1:3000'
+const rendererUrl = process.env.ELECTRON_RENDERER_URL || 'http://localhost:3000'
 const pollIntervalMs = Number(process.env.ELECTRON_POLL_INTERVAL_MS || 1200)
+const currentDirectory = path.dirname(fileURLToPath(import.meta.url))
+const clientDistDirectory = path.resolve(currentDirectory, '../dist/client')
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null
@@ -24,6 +29,22 @@ let pollInFlight = false
 /** @type {string | null} */
 let lastPollFingerprint = null
 
+const mimeTypes = new Map([
+  ['.css', 'text/css; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.html', 'text/html; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
+  ['.webp', 'image/webp'],
+  ['.gif', 'image/gif'],
+  ['.ico', 'image/x-icon'],
+  ['.woff', 'font/woff'],
+  ['.woff2', 'font/woff2'],
+])
+
 function emitPollingStatus(payload) {
   if (!mainWindow || mainWindow.isDestroyed()) {
     return
@@ -34,6 +55,51 @@ function emitPollingStatus(payload) {
     timestamp: new Date().toISOString(),
     ...payload,
   })
+}
+
+async function tryServeStaticAsset(req, res) {
+  if (!req.url) {
+    return false
+  }
+
+  const requestUrl = new URL(req.url, 'http://localhost')
+  const assetPath = decodeURIComponent(requestUrl.pathname)
+
+  if (assetPath === '/' || assetPath === '') {
+    return false
+  }
+
+  const relativePath = assetPath.replace(/^\//, '')
+  const filePath = path.resolve(clientDistDirectory, relativePath)
+  const relativeToClient = path.relative(clientDistDirectory, filePath)
+
+  if (relativeToClient.startsWith('..') || path.isAbsolute(relativeToClient)) {
+    return false
+  }
+
+  if (!existsSync(filePath)) {
+    return false
+  }
+
+  const fileStats = await stat(filePath)
+  if (!fileStats.isFile()) {
+    return false
+  }
+
+  const contentType = mimeTypes.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream'
+  res.statusCode = 200
+  res.setHeader('content-type', contentType)
+  res.setHeader('content-length', fileStats.size)
+  res.setHeader('cache-control', 'public, max-age=31536000, immutable')
+
+  await new Promise((resolve, reject) => {
+    const stream = createReadStream(filePath)
+    stream.on('error', reject)
+    stream.on('end', resolve)
+    stream.pipe(res)
+  })
+
+  return true
 }
 
 async function startEmbeddedServer() {
@@ -50,7 +116,11 @@ async function startEmbeddedServer() {
 
   localServer = createServer(async (req, res) => {
     try {
-      const origin = localServerUrl || 'http://127.0.0.1'
+      if (await tryServeStaticAsset(req, res)) {
+        return
+      }
+
+      const origin = localServerUrl || 'http://localhost'
       const requestUrl = new URL(req.url || '/', origin)
       const headers = new Headers()
 
@@ -96,7 +166,7 @@ async function startEmbeddedServer() {
 
   await new Promise((resolve, reject) => {
     localServer.once('error', reject)
-    localServer.listen(0, '127.0.0.1', () => {
+    localServer.listen(0, 'localhost', () => {
       localServer?.off('error', reject)
       resolve(undefined)
     })
@@ -107,7 +177,7 @@ async function startEmbeddedServer() {
     throw new Error('Could not determine embedded server address')
   }
 
-  localServerUrl = `http://127.0.0.1:${address.port}`
+  localServerUrl = `http://localhost:${address.port}`
   return localServerUrl
 }
 
