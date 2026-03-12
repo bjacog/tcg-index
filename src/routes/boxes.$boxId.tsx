@@ -212,7 +212,7 @@ function BoxDetailPage() {
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
               Webhook endpoint
             </p>
-            <code className="mt-2 block break-all rounded-lg bg-white px-3 py-2 text-sm text-slate-900 dark:bg-slate-900 dark:text-slate-100">
+            <code className="mt-2 block break-all rounded-lg border border-slate-300 bg-slate-200 px-3 py-2 text-sm font-medium !text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:!text-slate-100">
               {webhookUrl}
             </code>
             <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
