@@ -1,15 +1,16 @@
 import type { DelverWebhookEvent } from '../cards'
 import { CardError } from '../cards'
-import { appendScannedCardsToActiveBox } from './card-repository'
+import { appendScannedCardsToBox } from './card-repository'
+import { getBoxesWithPollingEndpoints } from './box-repository'
 import { getAppSettings, setAppSetting } from './store'
 
-export async function processDelverEvent(payload: DelverWebhookEvent) {
+export async function processDelverEvent(boxId: string, payload: DelverWebhookEvent) {
   const now = new Date().toISOString()
   setAppSetting('lastWebhookEventAt', now)
   setAppSetting('lastWebhookEventType', payload?.type ?? 'unknown')
 
   if (payload?.type === 'card_scanned') {
-    const result = await appendScannedCardsToActiveBox(payload.cards ?? [])
+    const result = await appendScannedCardsToBox(boxId, payload.cards ?? [])
 
     return {
       ok: true,
@@ -24,44 +25,78 @@ export async function processDelverEvent(payload: DelverWebhookEvent) {
     ok: true,
     type: payload?.type ?? 'unknown',
     ingested: 0,
+    boxId,
   }
 }
 
-export async function pollDelverEndpoint() {
+export async function pollDelverEndpoints() {
   const settings = getAppSettings()
 
-  if (!settings.delverPollingEndpoint) {
-    throw new Error('DELVER_POLLING_ENDPOINT_MISSING: Delver polling endpoint is not configured')
-  }
-
-  const response = await fetch(settings.delverPollingEndpoint, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
-
-  if (response.status === 404) {
+  if (!settings.delverPollingEnabled) {
     return {
       ok: true,
       empty: true,
-      status: 404,
+      status: 204,
+      boxResults: [],
     }
   }
 
-  if (!response.ok) {
-    throw new Error(`DELVER_POLL_FAILED: Delver poll failed with status ${response.status}`)
+  const boxes = await getBoxesWithPollingEndpoints()
+
+  if (boxes.length === 0) {
+    throw new Error('DELVER_POLLING_ENDPOINT_MISSING: No box polling endpoints are configured')
   }
 
-  const payload = (await response.json()) as DelverWebhookEvent
+  const results = await Promise.all(
+    boxes.map(async (box) => {
+      const response = await fetch(String(box.delverPollingEndpoint), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+        },
+      })
 
+      if (response.status === 404) {
+        return {
+          ok: true,
+          empty: true,
+          status: 404,
+          boxId: box.id,
+          boxCode: box.code,
+          endpoint: box.delverPollingEndpoint,
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(`DELVER_POLL_FAILED: ${box.code} poll failed with status ${response.status}`)
+      }
+
+      const payload = (await response.json()) as DelverWebhookEvent
+      const processed = await processDelverEvent(box.id, payload)
+
+      return {
+        ...processed,
+        empty: false,
+        status: response.status,
+        endpoint: box.delverPollingEndpoint,
+      }
+    }),
+  )
+
+  const nonEmptyResults = results.filter((result) => !result.empty)
+
+  return {
+    ok: true,
+    empty: nonEmptyResults.length === 0,
+    status: nonEmptyResults.length === 0 ? 404 : 200,
+    boxResults: results,
+    ingested: nonEmptyResults.reduce((sum, result) => sum + (result.ingested ?? 0), 0),
+  }
+}
+
+export async function pollDelverEndpointsSafely() {
   try {
-    const result = await processDelverEvent(payload)
-    return {
-      ...result,
-      empty: false,
-      status: response.status,
-    }
+    return await pollDelverEndpoints()
   } catch (error) {
     if (error instanceof CardError) {
       throw new Error(`${error.code}: ${error.message}`)

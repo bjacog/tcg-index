@@ -2,7 +2,6 @@ import { createServerFn } from '@tanstack/react-start'
 import {
   BoxError,
   type CreateBoxInput,
-  type SetActiveScanningBoxInput,
   type SetPollingEnabledInput,
   type UpdateBoxInput,
   type UpdatePollingSettingsInput,
@@ -13,7 +12,6 @@ import {
   getBoxById,
   getBoxSettings,
   listBoxes,
-  setActiveScanningBox,
   setPollingEnabled,
   stopScanning,
   updateBox,
@@ -85,16 +83,6 @@ export const updateBoxFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     try {
       return await updateBox(data)
-    } catch (error) {
-      mapError(error)
-    }
-  })
-
-export const setActiveScanningBoxFn = createServerFn({ method: 'POST' })
-  .inputValidator((input: SetActiveScanningBoxInput) => input)
-  .handler(async ({ data }) => {
-    try {
-      return await setActiveScanningBox(data)
     } catch (error) {
       mapError(error)
     }

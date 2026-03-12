@@ -4,6 +4,7 @@ export type BoxRecord = {
   name: string
   description: string
   locationNote: string
+  delverPollingEndpoint: string | null
   createdAt: string
   updatedAt: string
   kind: 'storage' | 'project'
@@ -11,7 +12,6 @@ export type BoxRecord = {
 }
 
 export type BoxSettings = {
-  activeScanningBoxId: string | null
   lastWebhookEventAt: string | null
   lastWebhookEventType: string | null
   delverPollingEndpoint: string | null
@@ -23,6 +23,7 @@ export type CreateBoxInput = {
   name: string
   description?: string
   locationNote?: string
+  delverPollingEndpoint?: string
 }
 
 export type UpdateBoxInput = {
@@ -31,10 +32,7 @@ export type UpdateBoxInput = {
   name?: string
   description?: string
   locationNote?: string
-}
-
-export type SetActiveScanningBoxInput = {
-  boxId: string | null
+  delverPollingEndpoint?: string
 }
 
 export type UpdatePollingSettingsInput = {
@@ -59,6 +57,7 @@ export function normalizeBoxInput(input: CreateBoxInput) {
   const name = input.name.trim()
   const description = input.description?.trim() ?? ''
   const locationNote = input.locationNote?.trim() ?? ''
+  const delverPollingEndpoint = input.delverPollingEndpoint?.trim() || null
 
   if (!code) {
     throw new BoxError('VALIDATION_ERROR', 'Box code is required')
@@ -68,5 +67,5 @@ export function normalizeBoxInput(input: CreateBoxInput) {
     throw new BoxError('VALIDATION_ERROR', 'Box name is required')
   }
 
-  return { code, name, description, locationNote }
+  return { code, name, description, locationNote, delverPollingEndpoint }
 }

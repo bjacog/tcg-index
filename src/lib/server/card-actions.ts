@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { CardError } from '../cards'
 import type { PickCardsInput, ReturnCardsInput } from '../pick-lists'
 import {
-  appendScannedCardsToActiveBox,
+  appendScannedCardsToBox,
   listCardsForBox,
   pickCardsIntoProject,
   returnCardsFromProject,
@@ -25,11 +25,11 @@ export const searchCardsByExactNamesFn = createServerFn({ method: 'POST' })
   .inputValidator((names: string[]) => names)
   .handler(async ({ data }) => searchCardsByExactNames(data))
 
-export const appendScannedCardsToActiveBoxFn = createServerFn({ method: 'POST' })
-  .inputValidator((cards: Parameters<typeof appendScannedCardsToActiveBox>[0]) => cards)
+export const appendScannedCardsToBoxFn = createServerFn({ method: 'POST' })
+  .inputValidator((input: { boxId: string; cards: Parameters<typeof appendScannedCardsToBox>[1] }) => input)
   .handler(async ({ data }) => {
     try {
-      return await appendScannedCardsToActiveBox(data)
+      return await appendScannedCardsToBox(data.boxId, data.cards)
     } catch (error) {
       mapError(error)
     }

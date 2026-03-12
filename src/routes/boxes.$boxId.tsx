@@ -2,25 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { listBoxesFn } from '../lib/server/box-actions'
 import { listCardsForBoxFn, returnCardsFromProjectFn } from '../lib/server/card-actions'
-import {
-  deleteBoxFn,
-  getBoxByIdFn,
-  getBoxSettingsFn,
-  setActiveScanningBoxFn,
-  updateBoxFn,
-} from '../lib/server/box-actions'
+import { deleteBoxFn, getBoxByIdFn, updateBoxFn } from '../lib/server/box-actions'
 
 export const Route = createFileRoute('/boxes/$boxId')({
   loader: async ({ params }) => {
     try {
-      const [box, cards, settings, boxes] = await Promise.all([
+      const [box, cards, boxes] = await Promise.all([
         getBoxByIdFn({ data: params.boxId }),
         listCardsForBoxFn({ data: params.boxId }),
-        getBoxSettingsFn(),
         listBoxesFn(),
       ])
 
-      return { box, cards, settings, boxes }
+      return { box, cards, boxes }
     } catch {
       throw notFound()
     }
@@ -37,7 +30,7 @@ function scryfallImageUrl(scryfallId: string) {
 }
 
 function BoxDetailPage() {
-  const { box, boxes, cards, settings } = Route.useLoaderData()
+  const { box, boxes, cards } = Route.useLoaderData()
   const router = useRouter()
   const navigate = useNavigate()
   const [form, setForm] = useState({
@@ -45,17 +38,16 @@ function BoxDetailPage() {
     name: box.name,
     description: box.description,
     locationNote: box.locationNote,
+    delverPollingEndpoint: box.delverPollingEndpoint ?? '',
   })
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
-  const [isTogglingActive, setIsTogglingActive] = useState(false)
   const [selectedReturnCardIds, setSelectedReturnCardIds] = useState<string[]>(cards.map((card) => card.id))
   const [returnDestinationBoxId, setReturnDestinationBoxId] = useState('')
   const [isReturningCards, setIsReturningCards] = useState(false)
 
   const isProjectBox = box.kind === 'project'
-  const isActiveScanningBox = settings.activeScanningBoxId === box.id
   const storageBoxes = useMemo(() => boxes.filter((candidate) => candidate.kind === 'storage'), [boxes])
   const allProjectCardIds = useMemo(() => cards.map((card) => card.id), [cards])
   const areAllProjectCardsSelected =
@@ -71,8 +63,9 @@ function BoxDetailPage() {
       name: box.name,
       description: box.description,
       locationNote: box.locationNote,
+      delverPollingEndpoint: box.delverPollingEndpoint ?? '',
     })
-  }, [box.code, box.description, box.locationNote, box.name])
+  }, [box.code, box.delverPollingEndpoint, box.description, box.locationNote, box.name])
 
   useEffect(() => {
     setSelectedReturnCardIds(cards.map((card) => card.id))
@@ -112,24 +105,6 @@ function BoxDetailPage() {
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Failed to delete box')
       setIsDeleting(false)
-    }
-  }
-
-  async function handleToggleActiveScanning() {
-    setError(null)
-    setIsTogglingActive(true)
-
-    try {
-      await setActiveScanningBoxFn({
-        data: {
-          boxId: isActiveScanningBox ? null : box.id,
-        },
-      })
-      await router.invalidate()
-    } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'Failed to update scanning box')
-    } finally {
-      setIsTogglingActive(false)
     }
   }
 
@@ -195,18 +170,6 @@ function BoxDetailPage() {
 
         {!isProjectBox ? (
           <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={handleToggleActiveScanning}
-              disabled={isTogglingActive}
-              className="rounded-xl border border-emerald-300 px-4 py-2.5 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
-            >
-              {isTogglingActive
-                ? 'Updating…'
-                : isActiveScanningBox
-                  ? 'Unset active scanner box'
-                  : 'Set as active scanner box'}
-            </button>
             <Link
               to="/boxes/$boxId/scan"
               params={{ boxId: box.id }}
@@ -224,14 +187,13 @@ function BoxDetailPage() {
             <div>
               <h2 className="text-lg font-semibold">Delver webhook</h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-                Point Delver at this endpoint. New scanned cards will append to this box only while it
-                is active.
+                Point Delver at this endpoint. New scanned cards will append to this box through its configured polling endpoint.
               </p>
             </div>
             <span
-              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${isActiveScanningBox ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${box.delverPollingEndpoint ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
             >
-              {isActiveScanningBox ? 'Active for scanning' : 'Inactive'}
+              {box.delverPollingEndpoint ? 'Polling endpoint configured' : 'No polling endpoint configured'}
             </span>
           </div>
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
@@ -306,6 +268,22 @@ function BoxDetailPage() {
                   </p>
                 ) : null}
               </label>
+              {!isProjectBox ? (
+                <label className="block text-sm">
+                  <span className="mb-1 block font-medium">Delver polling endpoint</span>
+                  <input
+                    value={form.delverPollingEndpoint}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, delverPollingEndpoint: event.target.value }))
+                    }
+                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950"
+                    placeholder="Set the box-specific polling endpoint"
+                  />
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Boxes with endpoints can be scanned concurrently when global polling is running.
+                  </p>
+                </label>
+              ) : null}
             </div>
 
             {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}

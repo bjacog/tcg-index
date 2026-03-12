@@ -16,7 +16,7 @@ import type {
 } from '../pick-lists'
 import { getBoxById } from './box-repository'
 import { getPickListById } from './pick-list-repository'
-import { getAppSettings, getDb, runInTransaction, setAppSetting } from './store'
+import { getDb, runInTransaction, setAppSetting } from './store'
 
 function mapCardRow(row: Record<string, unknown>): CardRecord {
   return {
@@ -78,17 +78,10 @@ export async function searchCardsByExactNames(names: string[]): Promise<CardSear
     }))
 }
 
-export async function appendScannedCardsToActiveBox(scannedCards: DelverScannedCard[]) {
-  const settings = getAppSettings()
-  const activeBoxId = settings.activeScanningBoxId
-
-  if (!activeBoxId) {
-    throw new CardError('NO_ACTIVE_SCANNING_BOX', 'No active scanning box is set')
-  }
-
-  const box = await getBoxById(activeBoxId)
+export async function appendScannedCardsToBox(boxId: string, scannedCards: DelverScannedCard[]) {
+  const box = await getBoxById(boxId)
   if (!box) {
-    throw new CardError('BOX_NOT_FOUND', 'Active scanning box no longer exists')
+    throw new CardError('BOX_NOT_FOUND', 'Scanning box no longer exists')
   }
 
   if (box.kind === 'project') {
@@ -99,7 +92,7 @@ export async function appendScannedCardsToActiveBox(scannedCards: DelverScannedC
   const createdCards = runInTransaction((db) => {
     const maxRow = db
       .prepare('SELECT COALESCE(MAX(position), 0) as max_position FROM cards WHERE box_id = ?')
-      .get(activeBoxId) as { max_position: number }
+      .get(boxId) as { max_position: number }
 
     let nextPosition = Number(maxRow.max_position) + 1
 
@@ -114,7 +107,7 @@ export async function appendScannedCardsToActiveBox(scannedCards: DelverScannedC
     const nextCards = scannedCards.map((scannedCard) => {
       const card: CardRecord = {
         id: randomUUID(),
-        boxId: activeBoxId,
+        boxId,
         position: nextPosition++,
         name: scannedCard.name?.trim() || 'Unknown card',
         edition: scannedCard.edition?.trim() || '',

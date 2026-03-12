@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { json } from '@tanstack/react-start'
-import { pollDelverEndpoint } from '../lib/server/delver'
+import { pollDelverEndpointsSafely } from '../lib/server/delver'
 
 function withCors(response: Response) {
   response.headers.set('Access-Control-Allow-Origin', '*')
@@ -15,7 +15,7 @@ export const Route = createFileRoute('/api/delver-poll')({
       OPTIONS: async () => withCors(json({ message: 'CORS preflight' })),
       POST: async () => {
         try {
-          return withCors(json(await pollDelverEndpoint()))
+          return withCors(json(await pollDelverEndpointsSafely()))
         } catch (error) {
           return withCors(
             json(

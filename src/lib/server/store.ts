@@ -18,18 +18,18 @@ type LegacyStore = {
     name: string
     description: string
     locationNote: string
+    delverPollingEndpoint?: string | null
     createdAt: string
     updatedAt: string
     kind?: 'storage' | 'project'
     projectNumber?: number | null
   }>
   cards?: CardRecord[]
-  settings?: Partial<BoxSettings>
+  settings?: Partial<BoxSettings> & { activeScanningBoxId?: string | null }
   pickLists?: PickListHistoryRecord[]
 }
 
 type AppSettingKey =
-  | 'activeScanningBoxId'
   | 'lastWebhookEventAt'
   | 'lastWebhookEventType'
   | 'delverPollingEndpoint'
@@ -52,6 +52,7 @@ function getDatabase() {
       name TEXT NOT NULL,
       description TEXT NOT NULL DEFAULT '',
       location_note TEXT NOT NULL DEFAULT '',
+      delver_polling_endpoint TEXT,
       kind TEXT NOT NULL DEFAULT 'storage',
       project_number INTEGER,
       created_at TEXT NOT NULL,
@@ -121,6 +122,10 @@ function migrateDatabase(db: DatabaseSync) {
     db.exec('ALTER TABLE boxes ADD COLUMN project_number INTEGER')
   }
 
+  if (!boxColumnNames.has('delver_polling_endpoint')) {
+    db.exec('ALTER TABLE boxes ADD COLUMN delver_polling_endpoint TEXT')
+  }
+
   db.exec(`
     UPDATE boxes
     SET kind = 'project'
@@ -139,11 +144,33 @@ function migrateDatabase(db: DatabaseSync) {
   if (!pickListColumnNames.has('project_box_id')) {
     db.exec('ALTER TABLE pick_lists ADD COLUMN project_box_id TEXT')
   }
+
+  const hasActiveScanningSetting = db
+    .prepare("SELECT 1 FROM app_settings WHERE key = 'activeScanningBoxId'")
+    .get() as { 1: number } | undefined
+
+  if (hasActiveScanningSetting) {
+    const activeRow = db
+      .prepare("SELECT value FROM app_settings WHERE key = 'activeScanningBoxId'")
+      .get() as { value: string | null } | undefined
+    const defaultEndpointRow = db
+      .prepare("SELECT value FROM app_settings WHERE key = 'delverPollingEndpoint'")
+      .get() as { value: string | null } | undefined
+
+    if (activeRow?.value && defaultEndpointRow?.value) {
+      db.prepare(
+        `UPDATE boxes
+         SET delver_polling_endpoint = COALESCE(delver_polling_endpoint, ?)
+         WHERE id = ? AND kind != 'project'`,
+      ).run(defaultEndpointRow.value, activeRow.value)
+    }
+
+    db.prepare("DELETE FROM app_settings WHERE key = 'activeScanningBoxId'").run()
+  }
 }
 
 function seedDefaultSettings(db: DatabaseSync) {
   const insertSetting = db.prepare('INSERT OR IGNORE INTO app_settings (key, value) VALUES (?, ?)')
-  insertSetting.run('activeScanningBoxId', null)
   insertSetting.run('lastWebhookEventAt', null)
   insertSetting.run('lastWebhookEventType', null)
   insertSetting.run('delverPollingEndpoint', null)
@@ -163,9 +190,14 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
   const raw = readFileSync(legacyJsonFilePath, 'utf8')
   const parsed = JSON.parse(raw) as LegacyStore
 
+  const defaultEndpoint = parsed.settings?.delverPollingEndpoint ?? null
+  const activeScanningBoxId = parsed.settings?.activeScanningBoxId ?? null
+
   const insertBox = db.prepare(`
-    INSERT INTO boxes (id, code, name, description, location_note, kind, project_number, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO boxes (
+      id, code, name, description, location_note, delver_polling_endpoint, kind, project_number, created_at, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const insertCard = db.prepare(`
@@ -192,12 +224,18 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
 
   runSqlTransaction(db, () => {
     for (const box of parsed.boxes ?? []) {
+      const endpoint =
+        box.delverPollingEndpoint ??
+        (activeScanningBoxId && activeScanningBoxId === box.id ? defaultEndpoint : null) ??
+        null
+
       insertBox.run(
         box.id,
         box.code,
         box.name,
         box.description ?? '',
         box.locationNote ?? '',
+        endpoint,
         box.kind ?? 'storage',
         box.projectNumber ?? null,
         box.createdAt,
@@ -228,7 +266,6 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
       )
     }
 
-    setSetting.run('activeScanningBoxId', parsed.settings?.activeScanningBoxId ?? null)
     setSetting.run('lastWebhookEventAt', parsed.settings?.lastWebhookEventAt ?? null)
     setSetting.run('lastWebhookEventType', parsed.settings?.lastWebhookEventType ?? null)
     setSetting.run('delverPollingEndpoint', parsed.settings?.delverPollingEndpoint ?? null)
@@ -277,7 +314,6 @@ export function setAppSetting(key: AppSettingKey, value: string | null) {
 
 export function getAppSettings(): BoxSettings {
   return {
-    activeScanningBoxId: getRawSetting('activeScanningBoxId'),
     lastWebhookEventAt: getRawSetting('lastWebhookEventAt'),
     lastWebhookEventType: getRawSetting('lastWebhookEventType'),
     delverPollingEndpoint: getRawSetting('delverPollingEndpoint'),

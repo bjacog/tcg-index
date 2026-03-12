@@ -4,7 +4,6 @@ import {
   type BoxRecord,
   type BoxSettings,
   type CreateBoxInput,
-  type SetActiveScanningBoxInput,
   type SetPollingEnabledInput,
   type UpdateBoxInput,
   type UpdatePollingSettingsInput,
@@ -19,6 +18,10 @@ function mapBoxRow(row: Record<string, unknown>): BoxRecord {
     name: String(row.name),
     description: String(row.description ?? ''),
     locationNote: String(row.location_note ?? ''),
+    delverPollingEndpoint:
+      row.delver_polling_endpoint === null || row.delver_polling_endpoint === undefined
+        ? null
+        : String(row.delver_polling_endpoint),
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     kind: String(row.kind ?? 'storage') === 'project' ? 'project' : 'storage',
@@ -44,6 +47,22 @@ export async function getBoxById(id: string) {
   return row ? mapBoxRow(row) : null
 }
 
+export async function getBoxesWithPollingEndpoints() {
+  const db = getDb()
+  const rows = db
+    .prepare(
+      `SELECT *
+       FROM boxes
+       WHERE kind != 'project'
+         AND delver_polling_endpoint IS NOT NULL
+         AND trim(delver_polling_endpoint) != ''
+       ORDER BY code ASC`,
+    )
+    .all() as Array<Record<string, unknown>>
+
+  return rows.map(mapBoxRow)
+}
+
 export async function getBoxSettings(): Promise<BoxSettings> {
   return getAppSettings()
 }
@@ -58,12 +77,18 @@ export async function updatePollingSettings(input: UpdatePollingSettingsInput) {
 export async function setPollingEnabled(input: SetPollingEnabledInput) {
   const settings = getAppSettings()
 
-  if (input.enabled && !settings.delverPollingEndpoint) {
-    throw new BoxError('POLLING_ENDPOINT_MISSING', 'Set the Delver polling endpoint first')
-  }
+  if (input.enabled) {
+    const boxes = await getBoxesWithPollingEndpoints()
+    if (boxes.length === 0) {
+      throw new BoxError(
+        'POLLING_ENDPOINT_MISSING',
+        'Add a Delver polling endpoint to at least one storage box first',
+      )
+    }
 
-  if (input.enabled && !settings.activeScanningBoxId) {
-    throw new BoxError('NO_ACTIVE_SCANNING_BOX', 'Set an active scanning box before polling')
+    if (!settings.delverPollingEndpoint && boxes.every((box) => !box.delverPollingEndpoint)) {
+      throw new BoxError('POLLING_ENDPOINT_MISSING', 'Set a Delver polling endpoint first')
+    }
   }
 
   setAppSetting('delverPollingEnabled', input.enabled ? 'true' : 'false')
@@ -89,6 +114,7 @@ export async function createBox(input: CreateBoxInput) {
     name: normalized.name,
     description: normalized.description,
     locationNote: normalized.locationNote,
+    delverPollingEndpoint: normalized.delverPollingEndpoint,
     createdAt: timestamp,
     updatedAt: timestamp,
     kind: 'storage',
@@ -96,14 +122,17 @@ export async function createBox(input: CreateBoxInput) {
   }
 
   db.prepare(
-    `INSERT INTO boxes (id, code, name, description, location_note, kind, project_number, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO boxes (
+      id, code, name, description, location_note, delver_polling_endpoint, kind, project_number, created_at, updated_at
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     box.id,
     box.code,
     box.name,
     box.description,
     box.locationNote,
+    box.delverPollingEndpoint,
     box.kind,
     box.projectNumber,
     box.createdAt,
@@ -139,6 +168,13 @@ export async function updateBox(input: UpdateBoxInput) {
     }
   }
 
+  if (isProjectBox && input.delverPollingEndpoint !== undefined) {
+    const nextEndpoint = input.delverPollingEndpoint.trim()
+    if (nextEndpoint) {
+      throw new BoxError('PROJECT_BOX_SCAN_FORBIDDEN', 'Project boxes cannot have a polling endpoint')
+    }
+  }
+
   const nextCode = input.code === undefined ? String(current.code) : input.code.trim()
   const nextName = input.name === undefined ? String(current.name) : input.name.trim()
   const nextDescription =
@@ -147,6 +183,12 @@ export async function updateBox(input: UpdateBoxInput) {
     input.locationNote === undefined
       ? String(current.location_note ?? '')
       : input.locationNote.trim()
+  const nextDelverPollingEndpoint =
+    input.delverPollingEndpoint === undefined
+      ? current.delver_polling_endpoint === null || current.delver_polling_endpoint === undefined
+        ? null
+        : String(current.delver_polling_endpoint)
+      : input.delverPollingEndpoint.trim() || null
 
   if (!nextCode) {
     throw new BoxError('VALIDATION_ERROR', 'Box code is required')
@@ -167,9 +209,17 @@ export async function updateBox(input: UpdateBoxInput) {
   const updatedAt = new Date().toISOString()
   db.prepare(
     `UPDATE boxes
-     SET code = ?, name = ?, description = ?, location_note = ?, updated_at = ?
+     SET code = ?, name = ?, description = ?, location_note = ?, delver_polling_endpoint = ?, updated_at = ?
      WHERE id = ?`,
-  ).run(nextCode, nextName, nextDescription, nextLocationNote, updatedAt, input.id)
+  ).run(
+    nextCode,
+    nextName,
+    nextDescription,
+    nextLocationNote,
+    nextDelverPollingEndpoint,
+    updatedAt,
+    input.id,
+  )
 
   return {
     id: input.id,
@@ -177,6 +227,7 @@ export async function updateBox(input: UpdateBoxInput) {
     name: nextName,
     description: nextDescription,
     locationNote: nextLocationNote,
+    delverPollingEndpoint: nextDelverPollingEndpoint,
     createdAt: String(current.created_at),
     updatedAt,
     kind: String(current.kind ?? 'storage') === 'project' ? 'project' : 'storage',
@@ -184,27 +235,8 @@ export async function updateBox(input: UpdateBoxInput) {
   } satisfies BoxRecord
 }
 
-export async function setActiveScanningBox(input: SetActiveScanningBoxInput) {
-  if (input.boxId !== null) {
-    const box = await getBoxById(input.boxId)
-    if (!box) {
-      throw new BoxError('BOX_NOT_FOUND', 'Box not found')
-    }
-
-    if (box.kind === 'project') {
-      throw new BoxError('PROJECT_BOX_SCAN_FORBIDDEN', 'Project boxes cannot be scan targets')
-    }
-  }
-
-  setAppSetting('activeScanningBoxId', input.boxId)
-  setAppSetting('delverPollingEnabled', input.boxId ? 'true' : 'false')
-
-  return getAppSettings()
-}
-
 export async function stopScanning() {
   setAppSetting('delverPollingEnabled', 'false')
-  setAppSetting('activeScanningBoxId', null)
   return getAppSettings()
 }
 
@@ -217,11 +249,6 @@ export async function deleteBox(id: string) {
 
   runInTransaction((db) => {
     db.prepare('DELETE FROM boxes WHERE id = ?').run(id)
-
-    if (getAppSettings().activeScanningBoxId === id) {
-      setAppSetting('activeScanningBoxId', null)
-      setAppSetting('delverPollingEnabled', 'false')
-    }
   })
 
   return box
