@@ -6,19 +6,6 @@ export const Route = createFileRoute('/')({
   component: DashboardPage,
 })
 
-const quickActions = [
-  {
-    title: 'Boxes',
-    description: 'Create and manage storage boxes.',
-    to: '/boxes',
-  },
-  {
-    title: 'Pick Lists',
-    description: 'Browse saved pick lists and generate new ones.',
-    to: '/pick-lists',
-  },
-]
-
 function DashboardPage() {
   const stats = Route.useLoaderData()
 
@@ -35,41 +22,32 @@ function DashboardPage() {
         </p>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          ['Boxes', String(stats.boxCount), 'Storage containers'],
-          [
-            'Indexed cards',
-            String(stats.indexedCardCount),
-            `${stats.uniqueCardNameCount} unique by name`,
-          ],
-          ['Pick lists', String(stats.pickListCount), 'Saved pick-list history'],
-          ['Scan sessions', '—', 'Box-context mobile flow'],
-        ].map(([label, value, hint]) => (
-          <div
-            key={label}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-          >
-            <p className="text-sm text-slate-500 dark:text-slate-400">{label}</p>
-            <p className="mt-3 text-3xl font-semibold">{value}</p>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{hint}</p>
-          </div>
-        ))}
-      </section>
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <Link
+          to="/boxes"
+          className="rounded-2xl border border-slate-200 bg-white p-5 no-underline shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-800"
+        >
+          <p className="text-sm text-slate-500 dark:text-slate-400">Boxes</p>
+          <p className="mt-3 text-3xl font-semibold">{stats.boxCount}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Storage containers</p>
+        </Link>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        {quickActions.map((action) => (
-          <Link
-            key={action.title}
-            to={action.to}
-            className="rounded-2xl border border-slate-200 bg-white p-5 no-underline shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-800"
-          >
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-              {action.title}
-            </h2>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">{action.description}</p>
-          </Link>
-        ))}
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-sm text-slate-500 dark:text-slate-400">Indexed cards</p>
+          <p className="mt-3 text-3xl font-semibold">{stats.indexedCardCount}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+            {stats.uniqueCardNameCount} unique by name
+          </p>
+        </div>
+
+        <Link
+          to="/pick-lists"
+          className="rounded-2xl border border-slate-200 bg-white p-5 no-underline shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-800"
+        >
+          <p className="text-sm text-slate-500 dark:text-slate-400">Pick lists</p>
+          <p className="mt-3 text-3xl font-semibold">{stats.pickListCount}</p>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Saved pick-list history</p>
+        </Link>
       </section>
     </div>
   )
