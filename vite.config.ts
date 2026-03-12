@@ -12,9 +12,10 @@ import tailwindcss from '@tailwindcss/vite'
 const certDirectory = path.resolve(process.cwd(), 'certs')
 const httpsKeyPath = path.join(certDirectory, 'localhost-key.pem')
 const httpsCertPath = path.join(certDirectory, 'localhost-cert.pem')
+const useHttps = process.env.VITE_DEV_HTTPS === 'true'
 
 const httpsConfig =
-  existsSync(httpsKeyPath) && existsSync(httpsCertPath)
+  useHttps && existsSync(httpsKeyPath) && existsSync(httpsCertPath)
     ? {
         key: readFileSync(httpsKeyPath),
         cert: readFileSync(httpsCertPath),

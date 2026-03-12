@@ -74,6 +74,37 @@ function BoxesPage() {
       return
     }
 
+    if (window.tcgIndexDesktop?.isElectron) {
+      return window.tcgIndexDesktop.onPollingStatus(async (result) => {
+        if (!result.ok) {
+          setPollStatus(result.message ?? 'Polling failed')
+          return
+        }
+
+        const scannedResults = (result.boxResults ?? []).filter(
+          (entry) => entry.type === 'card_scanned',
+        )
+
+        if (scannedResults.length > 0) {
+          const summary = scannedResults
+            .map(
+              (entry) =>
+                `${entry.boxCode}: ${entry.ingested ?? 0} card${entry.ingested === 1 ? '' : 's'}`,
+            )
+            .join(' · ')
+          setPollStatus(`Received scans — ${summary}`)
+          await router.invalidate()
+        } else if (result.empty) {
+          setPollStatus(
+            `Waiting for scans on ${activeScanningBoxes.length} active box${activeScanningBoxes.length === 1 ? '' : 'es'}…`,
+          )
+        } else {
+          setPollStatus('Received scanner event')
+          await router.invalidate()
+        }
+      })
+    }
+
     let cancelled = false
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -283,7 +314,7 @@ function BoxesPage() {
                   activeScanningBoxes.length === 0 ||
                   isStartingScanning
                 }
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="cursor-pointer rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isStartingScanning ? 'Starting…' : 'Start scanning'}
               </button>
@@ -291,7 +322,7 @@ function BoxesPage() {
                 type="button"
                 onClick={handleStopScanning}
                 disabled={!settings.delverPollingEnabled || isStoppingScanning}
-                className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
+                className="cursor-pointer rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
               >
                 {isStoppingScanning ? 'Stopping…' : 'Stop scanning'}
               </button>
@@ -370,7 +401,7 @@ function BoxesPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="mt-4 w-full cursor-pointer rounded-xl bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isSubmitting ? 'Creating…' : 'Create box'}
             </button>
@@ -396,7 +427,7 @@ function BoxesPage() {
             <button
               type="submit"
               disabled={isSavingPollingEndpoint}
-              className="mt-4 w-full rounded-xl border border-emerald-300 px-4 py-3 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+              className="mt-4 w-full cursor-pointer rounded-xl border border-emerald-300 px-4 py-3 text-sm font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
             >
               {isSavingPollingEndpoint ? 'Saving…' : 'Save default endpoint'}
             </button>
@@ -450,7 +481,15 @@ function BoxesPage() {
                         {isProjectBox ? (
                           <span className="text-slate-500 dark:text-slate-400">—</span>
                         ) : box.delverPollingEndpoint ? (
-                          <code title={box.delverPollingEndpoint} className="break-all">
+                          <code
+                            title={box.delverPollingEndpoint}
+                            className="inline-block break-all rounded border px-2 py-1 font-medium"
+                            style={{
+                              backgroundColor: '#e2e8f0',
+                              borderColor: '#cbd5e1',
+                              color: '#020617',
+                            }}
+                          >
                             {shortenEndpoint(box.delverPollingEndpoint)}
                           </code>
                         ) : (
@@ -485,7 +524,7 @@ function BoxesPage() {
                                   type="button"
                                   onClick={() => handleApplyDefaultEndpoint(box.id)}
                                   disabled={isApplyingDefaultToBoxId === box.id}
-                                  className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                                  className="cursor-pointer rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
                                 >
                                   {isApplyingDefaultToBoxId === box.id
                                     ? 'Applying…'
@@ -497,7 +536,7 @@ function BoxesPage() {
                               type="button"
                               onClick={() => handleToggleBoxPolling(box.id, !isActive)}
                               disabled={!isConfigured || isTogglingBoxPollingId === box.id}
-                              className="w-fit rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                              className="w-fit cursor-pointer rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
                             >
                               {isTogglingBoxPollingId === box.id
                                 ? 'Updating…'
@@ -513,19 +552,10 @@ function BoxesPage() {
                           <Link
                             to="/boxes/$boxId"
                             params={{ boxId: box.id }}
-                            className="text-emerald-700 dark:text-emerald-400"
+                            className="cursor-pointer text-emerald-700 dark:text-emerald-400"
                           >
                             Open
                           </Link>
-                          {!isProjectBox ? (
-                            <Link
-                              to="/boxes/$boxId/scan"
-                              params={{ boxId: box.id }}
-                              className="text-slate-600 dark:text-slate-300"
-                            >
-                              Scan
-                            </Link>
-                          ) : null}
                         </div>
                       </td>
                     </tr>
