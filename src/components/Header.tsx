@@ -13,7 +13,7 @@ export default function Header() {
       <nav className="mx-auto flex w-full max-w-6xl items-center gap-4 px-4 py-3 sm:px-6">
         <Link
           to="/"
-          className="text-base font-semibold tracking-tight text-slate-900 no-underline dark:text-slate-100"
+          className="cursor-pointer text-base font-semibold tracking-tight text-slate-900 no-underline dark:text-slate-100"
         >
           TCG Index
         </Link>
@@ -23,7 +23,7 @@ export default function Header() {
             <Link
               key={item.to}
               to={item.to}
-              className="text-sm font-medium text-slate-600 no-underline transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+              className="cursor-pointer text-sm font-medium text-slate-600 no-underline transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
               activeProps={{
                 className:
                   'text-sm font-medium text-emerald-700 no-underline dark:text-emerald-400',

@@ -152,7 +152,7 @@ function BoxDetailPage() {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-10">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <Link to="/boxes" className="text-sm text-emerald-700 dark:text-emerald-400">
+          <Link to="/boxes" className="cursor-pointer text-sm text-emerald-700 dark:text-emerald-400">
             ← Back to boxes
           </Link>
           <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -175,7 +175,7 @@ function BoxDetailPage() {
             <Link
               to="/boxes/$boxId/scan"
               params={{ boxId: box.id }}
-              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white"
+              className="cursor-pointer rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white"
             >
               Scan cards
             </Link>
@@ -324,7 +324,7 @@ function BoxDetailPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="cursor-pointer rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isSaving ? 'Saving…' : 'Save changes'}
               </button>
@@ -332,7 +332,7 @@ function BoxDetailPage() {
                 type="button"
                 onClick={handleDelete}
                 disabled={isDeleting}
-                className="rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
+                className="cursor-pointer rounded-xl border border-rose-300 px-4 py-2.5 text-sm font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
               >
                 {isDeleting ? 'Deleting…' : 'Delete box'}
               </button>
@@ -353,7 +353,7 @@ function BoxDetailPage() {
                   <button
                     type="button"
                     onClick={() => setSelectedReturnCardIds(areAllProjectCardsSelected ? [] : allProjectCardIds)}
-                    className="text-sm text-violet-700 dark:text-violet-400"
+                    className="cursor-pointer text-sm text-violet-700 dark:text-violet-400"
                   >
                     {areAllProjectCardsSelected ? 'Clear selection' : 'Select all'}
                   </button>
@@ -383,7 +383,7 @@ function BoxDetailPage() {
                   disabled={
                     isReturningCards || !returnDestinationBoxId || selectedReturnCardIds.length === 0
                   }
-                  className="rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  className="cursor-pointer rounded-xl bg-violet-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isReturningCards
                     ? 'Returning…'
@@ -393,7 +393,7 @@ function BoxDetailPage() {
                   type="button"
                   onClick={() => handleReturnCards(allProjectCardIds)}
                   disabled={isReturningCards || !returnDestinationBoxId || cards.length === 0}
-                  className="rounded-xl border border-violet-300 px-4 py-3 text-sm font-medium text-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900 dark:text-violet-400"
+                  className="cursor-pointer rounded-xl border border-violet-300 px-4 py-3 text-sm font-medium text-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-violet-900 dark:text-violet-400"
                 >
                   Return all and close project box
                 </button>
