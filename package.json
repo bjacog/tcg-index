@@ -1,5 +1,8 @@
 {
   "name": "tcg-index",
+  "version": "0.1.0",
+  "description": "Local-first trading card index with boxes, pick lists, and Delver scanning.",
+  "author": "Jaco Groenewald",
   "private": true,
   "type": "module",
   "main": "electron/main.mjs",
@@ -45,7 +48,8 @@
         "AppImage",
         "deb"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "maintainer": "Jaco Groenewald"
     }
   },
   "dependencies": {
