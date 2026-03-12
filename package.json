@@ -1,6 +1,6 @@
 {
   "name": "tcg-index",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Local-first trading card index with boxes, pick lists, and Delver scanning.",
   "author": "Jaco Groenewald",
   "private": true,
@@ -29,6 +29,7 @@
   "build": {
     "appId": "ai.openclaw.tcg-index",
     "productName": "TCG Index",
+    "icon": "public/logo.png",
     "files": [
       "dist/client/**/*",
       "dist/server/**/*",
@@ -40,14 +41,17 @@
       "output": "release"
     },
     "mac": {
-      "category": "public.app-category.utilities"
+      "category": "public.app-category.utilities",
+      "icon": "public/logo.png"
     },
     "win": {
+      "icon": "public/logo.png",
       "target": [
         "nsis"
       ]
     },
     "linux": {
+      "icon": "public/logo.png",
       "target": [
         "AppImage",
         "deb"
