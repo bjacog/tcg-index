@@ -483,7 +483,12 @@ function BoxesPage() {
                         ) : box.delverPollingEndpoint ? (
                           <code
                             title={box.delverPollingEndpoint}
-                            className="inline-block break-all rounded border border-slate-300 bg-slate-200 px-2 py-1 font-medium !text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:!text-slate-100"
+                            className="inline-block break-all rounded border px-2 py-1 font-medium"
+                            style={{
+                              backgroundColor: '#e2e8f0',
+                              borderColor: '#cbd5e1',
+                              color: '#020617',
+                            }}
                           >
                             {shortenEndpoint(box.delverPollingEndpoint)}
                           </code>
