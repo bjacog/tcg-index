@@ -65,7 +65,14 @@ function DashboardPage() {
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
               Data directory
             </p>
-            <code className="mt-2 block break-all rounded-lg border border-slate-300 bg-slate-200 px-3 py-2 text-sm font-medium !text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:!text-slate-100">
+            <code
+              className="mt-2 block break-all rounded-lg border px-3 py-2 text-sm font-medium"
+              style={{
+                backgroundColor: '#e2e8f0',
+                borderColor: '#cbd5e1',
+                color: '#020617',
+              }}
+            >
               {runtimeStatus.dataDirectory}
             </code>
           </div>
@@ -73,7 +80,14 @@ function DashboardPage() {
             <p className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
               SQLite database
             </p>
-            <code className="mt-2 block break-all rounded-lg border border-slate-300 bg-slate-200 px-3 py-2 text-sm font-medium !text-slate-950 dark:border-slate-700 dark:bg-slate-950 dark:!text-slate-100">
+            <code
+              className="mt-2 block break-all rounded-lg border px-3 py-2 text-sm font-medium"
+              style={{
+                backgroundColor: '#e2e8f0',
+                borderColor: '#cbd5e1',
+                color: '#020617',
+              }}
+            >
               {runtimeStatus.databaseFilePath}
             </code>
           </div>
