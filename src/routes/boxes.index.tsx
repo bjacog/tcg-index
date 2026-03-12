@@ -18,6 +18,20 @@ export const Route = createFileRoute('/boxes/')({
   component: BoxesPage,
 })
 
+function shortenEndpoint(endpoint: string | null, maxLength = 48) {
+  if (!endpoint) {
+    return '—'
+  }
+
+  if (endpoint.length <= maxLength) {
+    return endpoint
+  }
+
+  const prefixLength = Math.max(20, Math.floor((maxLength - 1) * 0.6))
+  const suffixLength = Math.max(10, maxLength - prefixLength - 1)
+  return `${endpoint.slice(0, prefixLength)}…${endpoint.slice(-suffixLength)}`
+}
+
 function BoxesPage() {
   const { boxes, settings } = Route.useLoaderData()
   const router = useRouter()
@@ -28,7 +42,9 @@ function BoxesPage() {
     locationNote: '',
     delverPollingEndpoint: settings.delverPollingEndpoint ?? '',
   })
-  const [defaultPollingEndpoint, setDefaultPollingEndpoint] = useState(settings.delverPollingEndpoint ?? '')
+  const [defaultPollingEndpoint, setDefaultPollingEndpoint] = useState(
+    settings.delverPollingEndpoint ?? '',
+  )
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSavingPollingEndpoint, setIsSavingPollingEndpoint] = useState(false)
@@ -83,7 +99,9 @@ function BoxesPage() {
           return
         }
 
-        const scannedResults = (result.boxResults ?? []).filter((entry) => entry.type === 'card_scanned')
+        const scannedResults = (result.boxResults ?? []).filter(
+          (entry) => entry.type === 'card_scanned',
+        )
 
         if (scannedResults.length > 0) {
           const summary = scannedResults
@@ -228,7 +246,8 @@ function BoxesPage() {
           </p>
           <h1 className="text-3xl font-semibold tracking-tight">Manage boxes</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-            Create, inspect, and maintain ordered storage boxes, plus temporary project boxes for picked cards.
+            Create, inspect, and maintain ordered storage boxes, plus temporary project boxes for
+            picked cards.
           </p>
         </div>
 
@@ -259,7 +278,11 @@ function BoxesPage() {
               <button
                 type="button"
                 onClick={handleStartScanning}
-                disabled={settings.delverPollingEnabled || activeScanningBoxes.length === 0 || isStartingScanning}
+                disabled={
+                  settings.delverPollingEnabled ||
+                  activeScanningBoxes.length === 0 ||
+                  isStartingScanning
+                }
                 className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isStartingScanning ? 'Starting…' : 'Start scanning'}
@@ -388,6 +411,7 @@ function BoxesPage() {
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Location</th>
+                <th className="px-4 py-3 font-medium">Endpoint</th>
                 <th className="px-4 py-3 font-medium">Scanner</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
@@ -396,7 +420,7 @@ function BoxesPage() {
               {boxes.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
                     No boxes yet. Create the first one on the left.
@@ -422,6 +446,17 @@ function BoxesPage() {
                       <td className="px-4 py-4 text-sm text-slate-600 dark:text-slate-300">
                         {box.locationNote || '—'}
                       </td>
+                      <td className="px-4 py-4 text-xs text-slate-600 dark:text-slate-300">
+                        {isProjectBox ? (
+                          <span className="text-slate-500 dark:text-slate-400">—</span>
+                        ) : box.delverPollingEndpoint ? (
+                          <code title={box.delverPollingEndpoint} className="break-all">
+                            {shortenEndpoint(box.delverPollingEndpoint)}
+                          </code>
+                        ) : (
+                          <span className="text-slate-500 dark:text-slate-400">Not set</span>
+                        )}
+                      </td>
                       <td className="px-4 py-4 text-sm">
                         {isProjectBox ? (
                           <span className="text-slate-500 dark:text-slate-400">Not available</span>
@@ -434,9 +469,7 @@ function BoxesPage() {
                                     ? settings.delverPollingEnabled
                                       ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
                                       : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                    : isConfigured
-                                      ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
                                 }`}
                               >
                                 {isActive
@@ -454,7 +487,9 @@ function BoxesPage() {
                                   disabled={isApplyingDefaultToBoxId === box.id}
                                   className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
                                 >
-                                  {isApplyingDefaultToBoxId === box.id ? 'Applying…' : 'Use default endpoint'}
+                                  {isApplyingDefaultToBoxId === box.id
+                                    ? 'Applying…'
+                                    : 'Use default endpoint'}
                                 </button>
                               ) : null}
                             </div>
