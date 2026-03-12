@@ -4,6 +4,8 @@ export type PickListHistoryRecord = {
   requestedCards: string[]
   missingCards: string[]
   resultSnapshot: PickListBoxGroup[]
+  pickedAt: string | null
+  projectBoxId: string | null
 }
 
 export type PickListBoxGroup = {

@@ -36,6 +36,7 @@ function PickListsHistoryPage() {
               <th className="px-4 py-3 font-medium">Created</th>
               <th className="px-4 py-3 font-medium">Requested cards</th>
               <th className="px-4 py-3 font-medium">Missing</th>
+              <th className="px-4 py-3 font-medium">Status</th>
               <th className="px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
@@ -43,7 +44,7 @@ function PickListsHistoryPage() {
             {pickLists.length === 0 ? (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                 >
                   No pick lists generated yet.
@@ -58,13 +59,35 @@ function PickListsHistoryPage() {
                   <td className="px-4 py-4 text-sm">{pickList.requestedCards.length}</td>
                   <td className="px-4 py-4 text-sm">{pickList.missingCards.length}</td>
                   <td className="px-4 py-4 text-sm">
-                    <Link
-                      to="/pick-lists/$pickListId"
-                      params={{ pickListId: pickList.id }}
-                      className="text-emerald-700 dark:text-emerald-400"
-                    >
-                      Open
-                    </Link>
+                    {pickList.pickedAt ? (
+                      <span className="inline-flex rounded-full bg-violet-100 px-3 py-1 text-xs font-medium text-violet-800 dark:bg-violet-950 dark:text-violet-300">
+                        Picked
+                      </span>
+                    ) : (
+                      <span className="inline-flex rounded-full bg-emerald-100 px-3 py-1 text-xs font-medium text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                        Ready to pick
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-4 text-sm">
+                    <div className="flex flex-wrap gap-3">
+                      <Link
+                        to="/pick-lists/$pickListId"
+                        params={{ pickListId: pickList.id }}
+                        className="text-emerald-700 dark:text-emerald-400"
+                      >
+                        Open
+                      </Link>
+                      {pickList.projectBoxId ? (
+                        <Link
+                          to="/boxes/$boxId"
+                          params={{ boxId: pickList.projectBoxId }}
+                          className="text-violet-700 dark:text-violet-400"
+                        >
+                          Project box
+                        </Link>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))

@@ -32,17 +32,29 @@ export async function createPickListHistory(input: {
     requestedCards: input.requestedCards,
     missingCards: input.missingCards,
     resultSnapshot: input.resultSnapshot,
+    pickedAt: null,
+    projectBoxId: null,
   }
 
   db.prepare(
-    `INSERT INTO pick_lists (id, created_at, requested_cards_json, missing_cards_json, result_snapshot_json)
-     VALUES (?, ?, ?, ?, ?)`,
+    `INSERT INTO pick_lists (
+      id,
+      created_at,
+      requested_cards_json,
+      missing_cards_json,
+      result_snapshot_json,
+      picked_at,
+      project_box_id
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.id,
     record.createdAt,
     JSON.stringify(record.requestedCards),
     JSON.stringify(record.missingCards),
     JSON.stringify(record.resultSnapshot),
+    record.pickedAt,
+    record.projectBoxId,
   )
 
   return record
@@ -80,5 +92,10 @@ function mapPickListRow(row: Record<string, unknown>): PickListHistoryRecord {
     requestedCards: JSON.parse(String(row.requested_cards_json ?? '[]')),
     missingCards: JSON.parse(String(row.missing_cards_json ?? '[]')),
     resultSnapshot: JSON.parse(String(row.result_snapshot_json ?? '[]')),
+    pickedAt: row.picked_at === null || row.picked_at === undefined ? null : String(row.picked_at),
+    projectBoxId:
+      row.project_box_id === null || row.project_box_id === undefined
+        ? null
+        : String(row.project_box_id),
   }
 }

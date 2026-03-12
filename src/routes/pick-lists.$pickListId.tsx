@@ -27,6 +27,7 @@ function PickListDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [isPicking, setIsPicking] = useState(false)
+  const isPicked = Boolean(pickList.pickedAt)
 
   function toggleCard(cardId: string, checked: boolean) {
     setSelectedCardIds((current) => {
@@ -39,6 +40,10 @@ function PickListDetailPage() {
   }
 
   async function handlePickSelectedCards() {
+    if (isPicked) {
+      return
+    }
+
     setError(null)
     setSuccessMessage(null)
     setIsPicking(true)
@@ -74,6 +79,11 @@ function PickListDetailPage() {
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
             Generated {new Date(pickList.createdAt).toLocaleString()}.
           </p>
+          {isPicked ? (
+            <p className="mt-2 text-sm text-violet-700 dark:text-violet-400">
+              Already picked {pickList.pickedAt ? new Date(pickList.pickedAt).toLocaleString() : ''}.
+            </p>
+          ) : null}
         </div>
         <Link
           to="/pick-list"
@@ -107,17 +117,31 @@ function PickListDetailPage() {
           <div>
             <h2 className="text-lg font-semibold">Pick into new project box</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Select the cards you want to move out of storage and into a fresh project box.
+              {isPicked
+                ? 'This pick list has already been used. You can still open the project box and return cards from there.'
+                : 'Select the cards you want to move out of storage and into a fresh project box.'}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handlePickSelectedCards}
-            disabled={isPicking || selectedCardIds.length === 0}
-            className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {isPicking ? 'Picking…' : `Pick ${selectedCardIds.length} selected card${selectedCardIds.length === 1 ? '' : 's'}`}
-          </button>
+          {isPicked && pickList.projectBoxId ? (
+            <Link
+              to="/boxes/$boxId"
+              params={{ boxId: pickList.projectBoxId }}
+              className="rounded-xl border border-violet-300 px-4 py-2.5 text-sm font-medium text-violet-700 dark:border-violet-900 dark:text-violet-400"
+            >
+              Open project box
+            </Link>
+          ) : (
+            <button
+              type="button"
+              onClick={handlePickSelectedCards}
+              disabled={isPicked || isPicking || selectedCardIds.length === 0}
+              className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isPicking
+                ? 'Picking…'
+                : `Pick ${selectedCardIds.length} selected card${selectedCardIds.length === 1 ? '' : 's'}`}
+            </button>
+          )}
         </div>
 
         {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
@@ -146,11 +170,14 @@ function PickListDetailPage() {
                 return (
                   <label
                     key={card.cardId}
-                    className="flex cursor-pointer items-center gap-4 px-4 py-4"
+                    className={`flex items-center gap-4 px-4 py-4 ${
+                      isPicked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={checked}
+                      disabled={isPicked}
                       onChange={(event) => toggleCard(card.cardId, event.target.checked)}
                       className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
                     />

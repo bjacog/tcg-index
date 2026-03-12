@@ -175,6 +175,10 @@ export async function pickCardsIntoProject(input: PickCardsInput): Promise<PickE
     throw new CardError('PICK_LIST_NOT_FOUND', 'Pick list not found')
   }
 
+  if (pickList.pickedAt) {
+    throw new CardError('PICK_LIST_ALREADY_PICKED', 'This pick list has already been picked')
+  }
+
   if (input.cardIds.length === 0) {
     throw new CardError('VALIDATION_ERROR', 'Select at least one card to pick')
   }
@@ -190,6 +194,18 @@ export async function pickCardsIntoProject(input: PickCardsInput): Promise<PickE
   }
 
   return runInTransaction((db) => {
+    const currentPickListRow = db
+      .prepare('SELECT picked_at FROM pick_lists WHERE id = ?')
+      .get(input.pickListId) as { picked_at: string | null } | undefined
+
+    if (!currentPickListRow) {
+      throw new CardError('PICK_LIST_NOT_FOUND', 'Pick list not found')
+    }
+
+    if (currentPickListRow.picked_at) {
+      throw new CardError('PICK_LIST_ALREADY_PICKED', 'This pick list has already been picked')
+    }
+
     const selectedCards = loadCardsByIds(db, input.cardIds)
     if (selectedCards.length !== input.cardIds.length) {
       throw new CardError('CARD_NOT_FOUND', 'One or more selected cards no longer exist')
@@ -222,6 +238,12 @@ export async function pickCardsIntoProject(input: PickCardsInput): Promise<PickE
     for (const sourceBoxId of sourceBoxes.keys()) {
       reindexBoxPositions(db, sourceBoxId)
     }
+
+    db.prepare('UPDATE pick_lists SET picked_at = ?, project_box_id = ? WHERE id = ?').run(
+      timestamp,
+      projectBox.id,
+      input.pickListId,
+    )
 
     return {
       projectBoxId: projectBox.id,

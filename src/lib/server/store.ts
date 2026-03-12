@@ -94,7 +94,9 @@ function getDatabase() {
       created_at TEXT NOT NULL,
       requested_cards_json TEXT NOT NULL,
       missing_cards_json TEXT NOT NULL,
-      result_snapshot_json TEXT NOT NULL
+      result_snapshot_json TEXT NOT NULL,
+      picked_at TEXT,
+      project_box_id TEXT
     );
 
     CREATE INDEX IF NOT EXISTS idx_pick_lists_created_at ON pick_lists(created_at DESC);
@@ -126,6 +128,17 @@ function migrateDatabase(db: DatabaseSync) {
       AND code GLOB 'PROJECT-[0-9]*'
       AND name GLOB 'Project [0-9]*'
   `)
+
+  const pickListColumns = db.prepare('PRAGMA table_info(pick_lists)').all() as Array<{ name: string }>
+  const pickListColumnNames = new Set(pickListColumns.map((column) => String(column.name)))
+
+  if (!pickListColumnNames.has('picked_at')) {
+    db.exec('ALTER TABLE pick_lists ADD COLUMN picked_at TEXT')
+  }
+
+  if (!pickListColumnNames.has('project_box_id')) {
+    db.exec('ALTER TABLE pick_lists ADD COLUMN project_box_id TEXT')
+  }
 }
 
 function seedDefaultSettings(db: DatabaseSync) {
@@ -165,8 +178,16 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
 
   const setSetting = db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)')
   const insertPickList = db.prepare(`
-    INSERT INTO pick_lists (id, created_at, requested_cards_json, missing_cards_json, result_snapshot_json)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO pick_lists (
+      id,
+      created_at,
+      requested_cards_json,
+      missing_cards_json,
+      result_snapshot_json,
+      picked_at,
+      project_box_id
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
 
   runSqlTransaction(db, () => {
@@ -220,6 +241,8 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
         JSON.stringify(pickList.requestedCards ?? []),
         JSON.stringify(pickList.missingCards ?? []),
         JSON.stringify(pickList.resultSnapshot ?? []),
+        pickList.pickedAt ?? null,
+        pickList.projectBoxId ?? null,
       )
     }
   })
