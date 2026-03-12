@@ -481,7 +481,10 @@ function BoxesPage() {
                         {isProjectBox ? (
                           <span className="text-slate-500 dark:text-slate-400">—</span>
                         ) : box.delverPollingEndpoint ? (
-                          <code title={box.delverPollingEndpoint} className="break-all">
+                          <code
+                            title={box.delverPollingEndpoint}
+                            className="inline-block break-all rounded bg-slate-100 px-2 py-1 text-slate-900 dark:bg-slate-900 dark:text-slate-100"
+                          >
                             {shortenEndpoint(box.delverPollingEndpoint)}
                           </code>
                         ) : (
