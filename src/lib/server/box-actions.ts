@@ -17,6 +17,7 @@ import {
   updateBox,
   updatePollingSettings,
 } from './box-repository'
+import { dataDirectory, databaseFilePath } from './store'
 
 function mapError(error: unknown): never {
   if (error instanceof BoxError) {
@@ -42,6 +43,13 @@ export const getBoxByIdFn = createServerFn({ method: 'GET' })
 
 export const getBoxSettingsFn = createServerFn({ method: 'GET' }).handler(async () => {
   return getBoxSettings()
+})
+
+export const getRuntimeStatusFn = createServerFn({ method: 'GET' }).handler(async () => {
+  return {
+    dataDirectory,
+    databaseFilePath,
+  }
 })
 
 export const updatePollingSettingsFn = createServerFn({ method: 'POST' })
