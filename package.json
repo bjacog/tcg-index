@@ -28,12 +28,14 @@
     "appId": "ai.openclaw.tcg-index",
     "productName": "TCG Index",
     "files": [
-      "dist/**/*",
+      "dist/client/**/*",
+      "dist/server/**/*",
       "electron/**/*",
       "package.json"
     ],
     "directories": {
-      "buildResources": "public"
+      "buildResources": "public",
+      "output": "release"
     },
     "mac": {
       "category": "public.app-category.utilities"
