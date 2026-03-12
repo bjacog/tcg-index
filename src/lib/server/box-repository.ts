@@ -22,10 +22,42 @@ function mapBoxRow(row: Record<string, unknown>): BoxRecord {
       row.delver_polling_endpoint === null || row.delver_polling_endpoint === undefined
         ? null
         : String(row.delver_polling_endpoint),
+    delverPollingActive: Number(row.delver_polling_active ?? 0) === 1,
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
     kind: String(row.kind ?? 'storage') === 'project' ? 'project' : 'storage',
     projectNumber: row.project_number === null ? null : Number(row.project_number ?? null),
+  }
+}
+
+function normalizeEndpoint(endpoint: string | null) {
+  return endpoint?.trim() || null
+}
+
+function assertUniqueActiveEndpoint(
+  db: ReturnType<typeof getDb>,
+  input: { id: string; endpoint: string | null; active: boolean },
+) {
+  if (!input.active || !input.endpoint) {
+    return
+  }
+
+  const duplicate = db
+    .prepare(
+      `SELECT id, code
+       FROM boxes
+       WHERE id != ?
+         AND kind != 'project'
+         AND delver_polling_active = 1
+         AND lower(trim(delver_polling_endpoint)) = lower(trim(?))`,
+    )
+    .get(input.id, input.endpoint) as { id: string; code: string } | undefined
+
+  if (duplicate) {
+    throw new BoxError(
+      'DELVER_ENDPOINT_ALREADY_ACTIVE',
+      `Delver endpoint is already active for ${duplicate.code}`,
+    )
   }
 }
 
@@ -47,13 +79,14 @@ export async function getBoxById(id: string) {
   return row ? mapBoxRow(row) : null
 }
 
-export async function getBoxesWithPollingEndpoints() {
+export async function getActivePollingBoxes() {
   const db = getDb()
   const rows = db
     .prepare(
       `SELECT *
        FROM boxes
        WHERE kind != 'project'
+         AND delver_polling_active = 1
          AND delver_polling_endpoint IS NOT NULL
          AND trim(delver_polling_endpoint) != ''
        ORDER BY code ASC`,
@@ -75,19 +108,13 @@ export async function updatePollingSettings(input: UpdatePollingSettingsInput) {
 }
 
 export async function setPollingEnabled(input: SetPollingEnabledInput) {
-  const settings = getAppSettings()
-
   if (input.enabled) {
-    const boxes = await getBoxesWithPollingEndpoints()
+    const boxes = await getActivePollingBoxes()
     if (boxes.length === 0) {
       throw new BoxError(
         'POLLING_ENDPOINT_MISSING',
-        'Add a Delver polling endpoint to at least one storage box first',
+        'Activate polling on at least one storage box first',
       )
-    }
-
-    if (!settings.delverPollingEndpoint && boxes.every((box) => !box.delverPollingEndpoint)) {
-      throw new BoxError('POLLING_ENDPOINT_MISSING', 'Set a Delver polling endpoint first')
     }
   }
 
@@ -115,6 +142,7 @@ export async function createBox(input: CreateBoxInput) {
     description: normalized.description,
     locationNote: normalized.locationNote,
     delverPollingEndpoint: normalized.delverPollingEndpoint,
+    delverPollingActive: false,
     createdAt: timestamp,
     updatedAt: timestamp,
     kind: 'storage',
@@ -123,9 +151,9 @@ export async function createBox(input: CreateBoxInput) {
 
   db.prepare(
     `INSERT INTO boxes (
-      id, code, name, description, location_note, delver_polling_endpoint, kind, project_number, created_at, updated_at
+      id, code, name, description, location_note, delver_polling_endpoint, delver_polling_active, kind, project_number, created_at, updated_at
     )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     box.id,
     box.code,
@@ -133,6 +161,7 @@ export async function createBox(input: CreateBoxInput) {
     box.description,
     box.locationNote,
     box.delverPollingEndpoint,
+    box.delverPollingActive ? 1 : 0,
     box.kind,
     box.projectNumber,
     box.createdAt,
@@ -175,6 +204,10 @@ export async function updateBox(input: UpdateBoxInput) {
     }
   }
 
+  if (isProjectBox && input.delverPollingActive) {
+    throw new BoxError('PROJECT_BOX_SCAN_FORBIDDEN', 'Project boxes cannot have active polling')
+  }
+
   const nextCode = input.code === undefined ? String(current.code) : input.code.trim()
   const nextName = input.name === undefined ? String(current.name) : input.name.trim()
   const nextDescription =
@@ -185,10 +218,12 @@ export async function updateBox(input: UpdateBoxInput) {
       : input.locationNote.trim()
   const nextDelverPollingEndpoint =
     input.delverPollingEndpoint === undefined
-      ? current.delver_polling_endpoint === null || current.delver_polling_endpoint === undefined
-        ? null
-        : String(current.delver_polling_endpoint)
-      : input.delverPollingEndpoint.trim() || null
+      ? normalizeEndpoint(String(current.delver_polling_endpoint ?? ''))
+      : normalizeEndpoint(input.delverPollingEndpoint)
+  const nextDelverPollingActive =
+    input.delverPollingActive === undefined
+      ? Number(current.delver_polling_active ?? 0) === 1
+      : input.delverPollingActive
 
   if (!nextCode) {
     throw new BoxError('VALIDATION_ERROR', 'Box code is required')
@@ -196,6 +231,13 @@ export async function updateBox(input: UpdateBoxInput) {
 
   if (!nextName) {
     throw new BoxError('VALIDATION_ERROR', 'Box name is required')
+  }
+
+  if (nextDelverPollingActive && !nextDelverPollingEndpoint) {
+    throw new BoxError(
+      'POLLING_ENDPOINT_MISSING',
+      'Set a Delver polling endpoint before activating polling for this box',
+    )
   }
 
   const duplicate = db
@@ -206,10 +248,16 @@ export async function updateBox(input: UpdateBoxInput) {
     throw new BoxError('BOX_CODE_CONFLICT', `Box code ${nextCode} already exists`)
   }
 
+  assertUniqueActiveEndpoint(db, {
+    id: input.id,
+    endpoint: nextDelverPollingEndpoint,
+    active: nextDelverPollingActive,
+  })
+
   const updatedAt = new Date().toISOString()
   db.prepare(
     `UPDATE boxes
-     SET code = ?, name = ?, description = ?, location_note = ?, delver_polling_endpoint = ?, updated_at = ?
+     SET code = ?, name = ?, description = ?, location_note = ?, delver_polling_endpoint = ?, delver_polling_active = ?, updated_at = ?
      WHERE id = ?`,
   ).run(
     nextCode,
@@ -217,6 +265,7 @@ export async function updateBox(input: UpdateBoxInput) {
     nextDescription,
     nextLocationNote,
     nextDelverPollingEndpoint,
+    nextDelverPollingActive ? 1 : 0,
     updatedAt,
     input.id,
   )
@@ -228,6 +277,7 @@ export async function updateBox(input: UpdateBoxInput) {
     description: nextDescription,
     locationNote: nextLocationNote,
     delverPollingEndpoint: nextDelverPollingEndpoint,
+    delverPollingActive: nextDelverPollingActive,
     createdAt: String(current.created_at),
     updatedAt,
     kind: String(current.kind ?? 'storage') === 'project' ? 'project' : 'storage',

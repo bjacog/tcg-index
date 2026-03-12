@@ -19,6 +19,7 @@ type LegacyStore = {
     description: string
     locationNote: string
     delverPollingEndpoint?: string | null
+    delverPollingActive?: boolean
     createdAt: string
     updatedAt: string
     kind?: 'storage' | 'project'
@@ -53,6 +54,7 @@ function getDatabase() {
       description TEXT NOT NULL DEFAULT '',
       location_note TEXT NOT NULL DEFAULT '',
       delver_polling_endpoint TEXT,
+      delver_polling_active INTEGER NOT NULL DEFAULT 0,
       kind TEXT NOT NULL DEFAULT 'storage',
       project_number INTEGER,
       created_at TEXT NOT NULL,
@@ -126,6 +128,10 @@ function migrateDatabase(db: DatabaseSync) {
     db.exec('ALTER TABLE boxes ADD COLUMN delver_polling_endpoint TEXT')
   }
 
+  if (!boxColumnNames.has('delver_polling_active')) {
+    db.exec('ALTER TABLE boxes ADD COLUMN delver_polling_active INTEGER NOT NULL DEFAULT 0')
+  }
+
   db.exec(`
     UPDATE boxes
     SET kind = 'project'
@@ -160,7 +166,8 @@ function migrateDatabase(db: DatabaseSync) {
     if (activeRow?.value && defaultEndpointRow?.value) {
       db.prepare(
         `UPDATE boxes
-         SET delver_polling_endpoint = COALESCE(delver_polling_endpoint, ?)
+         SET delver_polling_endpoint = COALESCE(delver_polling_endpoint, ?),
+             delver_polling_active = CASE WHEN kind != 'project' THEN 1 ELSE delver_polling_active END
          WHERE id = ? AND kind != 'project'`,
       ).run(defaultEndpointRow.value, activeRow.value)
     }
@@ -195,9 +202,9 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
 
   const insertBox = db.prepare(`
     INSERT INTO boxes (
-      id, code, name, description, location_note, delver_polling_endpoint, kind, project_number, created_at, updated_at
+      id, code, name, description, location_note, delver_polling_endpoint, delver_polling_active, kind, project_number, created_at, updated_at
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `)
 
   const insertCard = db.prepare(`
@@ -228,6 +235,8 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
         box.delverPollingEndpoint ??
         (activeScanningBoxId && activeScanningBoxId === box.id ? defaultEndpoint : null) ??
         null
+      const isActive =
+        box.delverPollingActive ?? Boolean(activeScanningBoxId && activeScanningBoxId === box.id && endpoint)
 
       insertBox.run(
         box.id,
@@ -236,6 +245,7 @@ function migrateLegacyJsonStore(db: DatabaseSync) {
         box.description ?? '',
         box.locationNote ?? '',
         endpoint,
+        isActive ? 1 : 0,
         box.kind ?? 'storage',
         box.projectNumber ?? null,
         box.createdAt,

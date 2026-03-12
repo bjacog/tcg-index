@@ -39,6 +39,7 @@ function BoxDetailPage() {
     description: box.description,
     locationNote: box.locationNote,
     delverPollingEndpoint: box.delverPollingEndpoint ?? '',
+    delverPollingActive: box.delverPollingActive,
   })
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -64,8 +65,9 @@ function BoxDetailPage() {
       description: box.description,
       locationNote: box.locationNote,
       delverPollingEndpoint: box.delverPollingEndpoint ?? '',
+      delverPollingActive: box.delverPollingActive,
     })
-  }, [box.code, box.delverPollingEndpoint, box.description, box.locationNote, box.name])
+  }, [box.code, box.delverPollingActive, box.delverPollingEndpoint, box.description, box.locationNote, box.name])
 
   useEffect(() => {
     setSelectedReturnCardIds(cards.map((card) => card.id))
@@ -191,9 +193,19 @@ function BoxDetailPage() {
               </p>
             </div>
             <span
-              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${box.delverPollingEndpoint ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'}`}
+              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                box.delverPollingActive && box.delverPollingEndpoint
+                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                  : box.delverPollingEndpoint
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+              }`}
             >
-              {box.delverPollingEndpoint ? 'Polling endpoint configured' : 'No polling endpoint configured'}
+              {box.delverPollingActive && box.delverPollingEndpoint
+                ? 'Box polling active'
+                : box.delverPollingEndpoint
+                  ? 'Endpoint configured only'
+                  : 'No polling endpoint configured'}
             </span>
           </div>
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-950/60">
@@ -280,8 +292,26 @@ function BoxDetailPage() {
                     placeholder="Set the box-specific polling endpoint"
                   />
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Boxes with endpoints can be scanned concurrently when global polling is running.
+                    Set the endpoint here, then enable box polling below or from the boxes list.
                   </p>
+                </label>
+              ) : null}
+
+              {!isProjectBox ? (
+                <label className="flex items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.delverPollingActive}
+                    disabled={!form.delverPollingEndpoint}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, delverPollingActive: event.target.checked }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>
+                    Enable polling for this box
+                    {!form.delverPollingEndpoint ? ' (set endpoint first)' : ''}
+                  </span>
                 </label>
               ) : null}
             </div>

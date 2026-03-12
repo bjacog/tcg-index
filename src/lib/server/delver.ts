@@ -1,7 +1,7 @@
 import type { DelverWebhookEvent } from '../cards'
 import { CardError } from '../cards'
 import { appendScannedCardsToBox } from './card-repository'
-import { getBoxesWithPollingEndpoints } from './box-repository'
+import { getActivePollingBoxes } from './box-repository'
 import { getAppSettings, setAppSetting } from './store'
 
 export async function processDelverEvent(boxId: string, payload: DelverWebhookEvent) {
@@ -41,10 +41,10 @@ export async function pollDelverEndpoints() {
     }
   }
 
-  const boxes = await getBoxesWithPollingEndpoints()
+  const boxes = await getActivePollingBoxes()
 
   if (boxes.length === 0) {
-    throw new Error('DELVER_POLLING_ENDPOINT_MISSING: No box polling endpoints are configured')
+    throw new Error('DELVER_POLLING_ENDPOINT_MISSING: No active box polling endpoints are configured')
   }
 
   const results = await Promise.all(

@@ -5,6 +5,7 @@ export type BoxRecord = {
   description: string
   locationNote: string
   delverPollingEndpoint: string | null
+  delverPollingActive: boolean
   createdAt: string
   updatedAt: string
   kind: 'storage' | 'project'
@@ -33,6 +34,7 @@ export type UpdateBoxInput = {
   description?: string
   locationNote?: string
   delverPollingEndpoint?: string
+  delverPollingActive?: boolean
 }
 
 export type UpdatePollingSettingsInput = {

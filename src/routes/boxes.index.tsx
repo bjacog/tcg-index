@@ -35,11 +35,12 @@ function BoxesPage() {
   const [isStoppingScanning, setIsStoppingScanning] = useState(false)
   const [isStartingScanning, setIsStartingScanning] = useState(false)
   const [isApplyingDefaultToBoxId, setIsApplyingDefaultToBoxId] = useState<string | null>(null)
+  const [isTogglingBoxPollingId, setIsTogglingBoxPollingId] = useState<string | null>(null)
   const [pollStatus, setPollStatus] = useState<string | null>(null)
 
   const storageBoxes = useMemo(() => boxes.filter((box) => box.kind === 'storage'), [boxes])
-  const scanningBoxes = useMemo(
-    () => storageBoxes.filter((box) => Boolean(box.delverPollingEndpoint)),
+  const activeScanningBoxes = useMemo(
+    () => storageBoxes.filter((box) => box.delverPollingActive && box.delverPollingEndpoint),
     [storageBoxes],
   )
 
@@ -52,7 +53,7 @@ function BoxesPage() {
   }, [settings.delverPollingEndpoint])
 
   useEffect(() => {
-    if (!settings.delverPollingEnabled || scanningBoxes.length === 0) {
+    if (!settings.delverPollingEnabled || activeScanningBoxes.length === 0) {
       setPollStatus(null)
       return
     }
@@ -66,12 +67,10 @@ function BoxesPage() {
         const result = (await response.json()) as {
           ok: boolean
           empty?: boolean
-          ingested?: number
           boxResults?: Array<{
             boxCode?: string
             type?: string
             ingested?: number
-            empty?: boolean
           }>
           message?: string
         }
@@ -96,7 +95,9 @@ function BoxesPage() {
           setPollStatus(`Received scans — ${summary}`)
           await router.invalidate()
         } else if (result.empty) {
-          setPollStatus(`Waiting for scans on ${scanningBoxes.length} box${scanningBoxes.length === 1 ? '' : 'es'}…`)
+          setPollStatus(
+            `Waiting for scans on ${activeScanningBoxes.length} active box${activeScanningBoxes.length === 1 ? '' : 'es'}…`,
+          )
         } else {
           setPollStatus('Received scanner event')
           await router.invalidate()
@@ -116,7 +117,7 @@ function BoxesPage() {
       cancelled = true
       if (timeoutId) clearTimeout(timeoutId)
     }
-  }, [router, scanningBoxes, settings.delverPollingEnabled])
+  }, [router, activeScanningBoxes, settings.delverPollingEnabled])
 
   async function handleCreateBox(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -186,6 +187,24 @@ function BoxesPage() {
     }
   }
 
+  async function handleToggleBoxPolling(boxId: string, nextActive: boolean) {
+    setError(null)
+    setIsTogglingBoxPollingId(boxId)
+    try {
+      await updateBoxFn({
+        data: {
+          id: boxId,
+          delverPollingActive: nextActive,
+        },
+      })
+      await router.invalidate()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Failed to update box polling')
+    } finally {
+      setIsTogglingBoxPollingId(null)
+    }
+  }
+
   async function handleStopScanning() {
     setError(null)
     setIsStoppingScanning(true)
@@ -217,10 +236,10 @@ function BoxesPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-1">
               <div>
-                <span className="font-medium">Scanning boxes:</span>{' '}
-                {scanningBoxes.length === 0
-                  ? 'None configured'
-                  : scanningBoxes.map((box) => box.code).join(', ')}
+                <span className="font-medium">Active polling boxes:</span>{' '}
+                {activeScanningBoxes.length === 0
+                  ? 'None selected'
+                  : activeScanningBoxes.map((box) => box.code).join(', ')}
               </div>
               <div>
                 <span className="font-medium">Polling:</span>{' '}
@@ -240,7 +259,7 @@ function BoxesPage() {
               <button
                 type="button"
                 onClick={handleStartScanning}
-                disabled={settings.delverPollingEnabled || scanningBoxes.length === 0 || isStartingScanning}
+                disabled={settings.delverPollingEnabled || activeScanningBoxes.length === 0 || isStartingScanning}
                 className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {isStartingScanning ? 'Starting…' : 'Start scanning'}
@@ -387,6 +406,7 @@ function BoxesPage() {
                 boxes.map((box) => {
                   const isProjectBox = box.kind === 'project'
                   const isConfigured = Boolean(box.delverPollingEndpoint)
+                  const isActive = Boolean(box.delverPollingActive && box.delverPollingEndpoint)
 
                   return (
                     <tr key={box.id}>
@@ -406,32 +426,50 @@ function BoxesPage() {
                         {isProjectBox ? (
                           <span className="text-slate-500 dark:text-slate-400">Not available</span>
                         ) : (
-                          <div className="flex items-center gap-3">
-                            <span
-                              className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
-                                isConfigured
-                                  ? settings.delverPollingEnabled
-                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                  : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                              }`}
-                            >
-                              {isConfigured
-                                ? settings.delverPollingEnabled
-                                  ? 'Configured + polling'
-                                  : 'Configured'
-                                : 'Not configured'}
-                            </span>
-                            {!isConfigured && defaultPollingEndpoint ? (
-                              <button
-                                type="button"
-                                onClick={() => handleApplyDefaultEndpoint(box.id)}
-                                disabled={isApplyingDefaultToBoxId === box.id}
-                                className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${
+                                  isActive
+                                    ? settings.delverPollingEnabled
+                                      ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                      : 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
+                                    : isConfigured
+                                      ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                      : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                                }`}
                               >
-                                {isApplyingDefaultToBoxId === box.id ? 'Applying…' : 'Use default endpoint'}
-                              </button>
-                            ) : null}
+                                {isActive
+                                  ? settings.delverPollingEnabled
+                                    ? 'Active + polling'
+                                    : 'Active'
+                                  : isConfigured
+                                    ? 'Configured only'
+                                    : 'Not configured'}
+                              </span>
+                              {!isConfigured && defaultPollingEndpoint ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApplyDefaultEndpoint(box.id)}
+                                  disabled={isApplyingDefaultToBoxId === box.id}
+                                  className="rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                                >
+                                  {isApplyingDefaultToBoxId === box.id ? 'Applying…' : 'Use default endpoint'}
+                                </button>
+                              ) : null}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleBoxPolling(box.id, !isActive)}
+                              disabled={!isConfigured || isTogglingBoxPollingId === box.id}
+                              className="w-fit rounded-xl border border-emerald-300 px-3 py-2 text-xs font-medium text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-emerald-900 dark:text-emerald-400"
+                            >
+                              {isTogglingBoxPollingId === box.id
+                                ? 'Updating…'
+                                : isActive
+                                  ? 'Disable box polling'
+                                  : 'Enable box polling'}
+                            </button>
                           </div>
                         )}
                       </td>
