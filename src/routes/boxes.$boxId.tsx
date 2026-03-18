@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute, notFound, useNavigate, useRouter } from '@tanstack/react-router'
 import { listBoxesFn } from '../lib/server/box-actions'
-import { listCardsForBoxFn, returnCardsFromProjectFn } from '../lib/server/card-actions'
+import {
+  listCardsForBoxFn,
+  removeCardFromBoxFn,
+  removeIndexGapsForBoxFn,
+  returnCardsFromProjectFn,
+} from '../lib/server/card-actions'
 import { deleteBoxFn, getBoxByIdFn, updateBoxFn } from '../lib/server/box-actions'
 
 export const Route = createFileRoute('/boxes/$boxId')({
@@ -47,6 +52,9 @@ function BoxDetailPage() {
   const [selectedReturnCardIds, setSelectedReturnCardIds] = useState<string[]>(cards.map((card) => card.id))
   const [returnDestinationBoxId, setReturnDestinationBoxId] = useState('')
   const [isReturningCards, setIsReturningCards] = useState(false)
+  const [removingCardId, setRemovingCardId] = useState<string | null>(null)
+  const [isCompactingIndexes, setIsCompactingIndexes] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
   const isProjectBox = box.kind === 'project'
   const storageBoxes = useMemo(() => boxes.filter((candidate) => candidate.kind === 'storage'), [boxes])
@@ -76,6 +84,7 @@ function BoxDetailPage() {
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    setSuccessMessage(null)
     setIsSaving(true)
 
     try {
@@ -85,6 +94,7 @@ function BoxDetailPage() {
           ...form,
         },
       })
+      setSuccessMessage('Box settings saved.')
       await router.invalidate()
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Failed to update box')
@@ -98,6 +108,7 @@ function BoxDetailPage() {
     if (!confirmed) return
 
     setError(null)
+    setSuccessMessage(null)
     setIsDeleting(true)
 
     try {
@@ -122,6 +133,7 @@ function BoxDetailPage() {
 
   async function handleReturnCards(cardIds = selectedReturnCardIds) {
     setError(null)
+    setSuccessMessage(null)
     setIsReturningCards(true)
 
     try {
@@ -140,11 +152,51 @@ function BoxDetailPage() {
         return
       }
 
+      setSuccessMessage(`Returned ${result.movedCardCount} card${result.movedCardCount === 1 ? '' : 's'} to ${result.destinationBoxCode}.`)
       await navigate({ to: '/boxes/$boxId', params: { boxId: box.id } })
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : 'Failed to return cards')
     } finally {
       setIsReturningCards(false)
+    }
+  }
+
+  async function handleRemoveCard(cardId: string, cardName: string) {
+    const confirmed = window.confirm(`Remove ${cardName} from ${box.code}? Cards after it will be reindexed.`)
+    if (!confirmed) return
+
+    setError(null)
+    setSuccessMessage(null)
+    setRemovingCardId(cardId)
+
+    try {
+      await removeCardFromBoxFn({ data: { boxId: box.id, cardId } })
+      setSuccessMessage(`Removed ${cardName}. Following cards were reindexed.`)
+      await router.invalidate()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Failed to remove card')
+    } finally {
+      setRemovingCardId(null)
+    }
+  }
+
+  async function handleRemoveIndexGaps() {
+    setError(null)
+    setSuccessMessage(null)
+    setIsCompactingIndexes(true)
+
+    try {
+      const result = await removeIndexGapsForBoxFn({ data: box.id })
+      setSuccessMessage(
+        result.movedCount > 0
+          ? `Removed index gaps for ${result.movedCount} card${result.movedCount === 1 ? '' : 's'}.`
+          : 'No index gaps found in this box.',
+      )
+      await router.invalidate()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : 'Failed to remove index gaps')
+    } finally {
+      setIsCompactingIndexes(false)
     }
   }
 
@@ -179,6 +231,14 @@ function BoxDetailPage() {
             >
               Scan cards
             </Link>
+            <button
+              type="button"
+              onClick={handleRemoveIndexGaps}
+              disabled={isCompactingIndexes}
+              className="cursor-pointer rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium dark:border-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isCompactingIndexes ? 'Removing gaps…' : 'Remove index gaps'}
+            </button>
           </div>
         ) : null}
       </div>
@@ -319,6 +379,9 @@ function BoxDetailPage() {
             </div>
 
             {error ? <p className="mt-4 text-sm text-rose-600 dark:text-rose-400">{error}</p> : null}
+            {!error && successMessage ? (
+              <p className="mt-4 text-sm text-emerald-700 dark:text-emerald-400">{successMessage}</p>
+            ) : null}
 
             <div className="mt-4 flex flex-wrap gap-3">
               <button
@@ -419,13 +482,14 @@ function BoxDetailPage() {
                 <th className="px-4 py-3 font-medium">Set</th>
                 <th className="px-4 py-3 font-medium">Finish</th>
                 <th className="px-4 py-3 font-medium">Condition</th>
+                <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
               {cards.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={isProjectBox ? 6 : 5}
+                    colSpan={isProjectBox ? 7 : 6}
                     className="px-4 py-10 text-center text-sm text-slate-500 dark:text-slate-400"
                   >
                     No cards in this box yet.
@@ -472,6 +536,16 @@ function BoxDetailPage() {
                       </td>
                       <td className="px-4 py-4 text-sm">{card.finish || '—'}</td>
                       <td className="px-4 py-4 text-sm">{card.condition || '—'}</td>
+                      <td className="px-4 py-4 text-sm">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveCard(card.id, card.name)}
+                          disabled={removingCardId === card.id}
+                          className="cursor-pointer rounded-xl border border-rose-300 px-3 py-2 text-xs font-medium text-rose-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-rose-900 dark:text-rose-400"
+                        >
+                          {removingCardId === card.id ? 'Removing…' : 'Remove'}
+                        </button>
+                      </td>
                     </tr>
                   )
                 })

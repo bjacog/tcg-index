@@ -5,6 +5,8 @@ import {
   appendScannedCardsToBox,
   listCardsForBox,
   pickCardsIntoProject,
+  removeCardFromBox,
+  removeIndexGapsForBox,
   returnCardsFromProject,
   searchCardsByExactNames,
 } from './card-repository'
@@ -30,6 +32,26 @@ export const appendScannedCardsToBoxFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     try {
       return await appendScannedCardsToBox(data.boxId, data.cards)
+    } catch (error) {
+      mapError(error)
+    }
+  })
+
+export const removeCardFromBoxFn = createServerFn({ method: 'POST' })
+  .inputValidator((input: { boxId: string; cardId: string }) => input)
+  .handler(async ({ data }) => {
+    try {
+      return await removeCardFromBox(data)
+    } catch (error) {
+      mapError(error)
+    }
+  })
+
+export const removeIndexGapsForBoxFn = createServerFn({ method: 'POST' })
+  .inputValidator((boxId: string) => boxId)
+  .handler(async ({ data }) => {
+    try {
+      return await removeIndexGapsForBox(data)
     } catch (error) {
       mapError(error)
     }

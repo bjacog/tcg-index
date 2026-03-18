@@ -162,6 +162,76 @@ export async function appendScannedCardsToBox(boxId: string, scannedCards: Delve
   }
 }
 
+export async function removeCardFromBox(input: { boxId: string; cardId: string }) {
+  return runInTransaction((db) => {
+    const box = loadBoxById(db, input.boxId)
+    if (!box) {
+      throw new CardError('BOX_NOT_FOUND', 'Box not found')
+    }
+
+    const row = db.prepare('SELECT * FROM cards WHERE id = ?').get(input.cardId) as
+      | Record<string, unknown>
+      | undefined
+
+    if (!row) {
+      throw new CardError('CARD_NOT_FOUND', 'Card not found')
+    }
+
+    const card = mapCardRow(row)
+
+    if (card.boxId !== box.id) {
+      throw new CardError('CARD_NOT_IN_BOX', 'Card is not in the selected box')
+    }
+
+    db.prepare('DELETE FROM cards WHERE id = ?').run(card.id)
+    reindexBoxPositions(db, box.id)
+
+    return {
+      boxId: box.id,
+      boxCode: box.code,
+      removedCardId: card.id,
+      removedPosition: card.position,
+      remainingCardCount: Number(
+        (db.prepare('SELECT COUNT(*) as count FROM cards WHERE box_id = ?').get(box.id) as { count: number })
+          .count,
+      ),
+    }
+  })
+}
+
+export async function removeIndexGapsForBox(boxId: string) {
+  return runInTransaction((db) => {
+    const box = loadBoxById(db, boxId)
+    if (!box) {
+      throw new CardError('BOX_NOT_FOUND', 'Box not found')
+    }
+
+    const beforeRows = db
+      .prepare('SELECT id, position FROM cards WHERE box_id = ? ORDER BY position ASC, created_at ASC, id ASC')
+      .all(boxId) as Array<{ id: string; position: number }>
+
+    reindexBoxPositions(db, boxId)
+
+    const afterRows = db
+      .prepare('SELECT id, position FROM cards WHERE box_id = ? ORDER BY position ASC, created_at ASC, id ASC')
+      .all(boxId) as Array<{ id: string; position: number }>
+
+    let movedCount = 0
+    beforeRows.forEach((row, index) => {
+      if (row.position !== afterRows[index]?.position) {
+        movedCount += 1
+      }
+    })
+
+    return {
+      boxId: box.id,
+      boxCode: box.code,
+      cardCount: afterRows.length,
+      movedCount,
+    }
+  })
+}
+
 export async function pickCardsIntoProject(input: PickCardsInput): Promise<PickExecutionResult> {
   const pickList = await getPickListById(input.pickListId)
   if (!pickList) {
