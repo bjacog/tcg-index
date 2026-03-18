@@ -1,6 +1,6 @@
 {
   "name": "tcg-index",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Local-first trading card index with boxes, pick lists, and Delver scanning.",
   "author": "Jaco Groenewald",
   "private": true,
