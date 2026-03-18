@@ -65,6 +65,7 @@ function BoxDetailPage() {
     if (typeof window === 'undefined') return '/api/delver-webhook'
     return `${window.location.origin}/api/delver-webhook`
   }, [])
+  const displayedCards = useMemo(() => [...cards].sort((a, b) => b.position - a.position), [cards])
 
   useEffect(() => {
     setForm({
@@ -469,7 +470,7 @@ function BoxDetailPage() {
           <div className="border-b border-slate-200 px-4 py-4 dark:border-slate-800">
             <h2 className="text-lg font-semibold">Cards in this box</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              {cards.length} {cards.length === 1 ? 'card' : 'cards'} indexed in order.
+              {cards.length} {cards.length === 1 ? 'card' : 'cards'} shown highest index first.
             </p>
           </div>
 
@@ -486,7 +487,7 @@ function BoxDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-              {cards.length === 0 ? (
+              {displayedCards.length === 0 ? (
                 <tr>
                   <td
                     colSpan={isProjectBox ? 7 : 6}
@@ -496,7 +497,7 @@ function BoxDetailPage() {
                   </td>
                 </tr>
               ) : (
-                cards.map((card) => {
+                displayedCards.map((card) => {
                   const imageUrl = scryfallImageUrl(card.scryfallId)
                   const checked = selectedReturnCardIds.includes(card.id)
 
